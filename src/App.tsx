@@ -49,7 +49,7 @@ function Nav() {
         <a href="#work" className="hidden sm:inline-block transition-all duration-300 hover:scale-110 hover:text-paper">Work</a>
         <Magnetic strength={0.4} className="inline-block">
           <a
-            href="mailto:irehan29@icloud.com"
+            href="#contact"
             className="inline-block whitespace-nowrap border border-paper/30 px-3 py-2 text-paper transition-colors hover:bg-paper hover:text-ink sm:px-4"
           >
             Get in touch
@@ -177,8 +177,9 @@ function Footer() {
     <footer id="contact" data-act="finale" data-act-progress="1" className="act-finale border-t border-line">
       <div className="act-finale-bloom" aria-hidden="true" />
       <div className="act-finale-inner px-4 py-20 sm:px-6 md:px-12 md:py-24">
-        <h2 className="reveal font-serif text-5xl tracking-tight sm:text-6xl md:text-8xl">
-          Let&rsquo;s build <span className="italic text-amber">something.</span>
+        <p className="reveal text-sm tracking-[0.2em] uppercase text-muted">Contact</p>
+        <h2 className="reveal mt-4 font-serif text-5xl tracking-tight sm:text-6xl md:text-8xl">
+          Let&rsquo;s talk<span className="italic text-amber">.</span>
         </h2>
         <Magnetic strength={0.25} className="inline-block">
           <a
