@@ -24,11 +24,11 @@ export const CASE_STUDIES: CaseStudy[] = [
   {
     index: '02',
     name: 'Laffy',
-    tagline: 'Placeholder tagline — describe Laffy here.',
+    tagline: 'Scan. Personalize. Unbox.',
     description:
-      'Add a short paragraph describing what Laffy does, who it is for, and what problem it solves. Keep it to two or three sentences in the same tone as the Surge entry above.',
-    stack: ['Stack', 'Goes', 'Here'],
-    url: '#',
+      'A premium AI skincare flow that turns a consent-based skin scan and short questionnaire into a personalized routine box. The homepage frames the product as a four-chapter system: scan, goals, routine, and box.',
+    stack: ['React', 'Vite', 'AI Skin Scan', 'Routine Builder', 'Vercel'],
+    url: 'https://laffyfinal.vercel.app/',
     linkLabel: 'Visit Laffy',
     year: '2026',
   },
