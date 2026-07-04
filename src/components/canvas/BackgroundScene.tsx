@@ -4,7 +4,6 @@ import { Float } from '@react-three/drei'
 import {
   AdditiveBlending,
   BackSide,
-  BufferAttribute,
   BufferGeometry,
   Color,
   Curve,
@@ -135,25 +134,6 @@ function makeTube(path: Curve<Vector3>) {
   return new TubeGeometry(path, 240, 0.16, 24, true)
 }
 
-function updateMorphGeometry(
-  geometry: BufferGeometry,
-  knotPositions: BufferAttribute,
-  linePositions: BufferAttribute,
-  amount: number,
-) {
-  const position = geometry.getAttribute('position') as BufferAttribute
-  const target = position.array
-  const knot = knotPositions.array
-  const line = linePositions.array
-
-  for (let i = 0; i < target.length; i++) {
-    target[i] = knot[i] + (line[i] - knot[i]) * amount
-  }
-
-  position.needsUpdate = true
-  geometry.computeVertexNormals()
-}
-
 /** 3-step gradient map for the toon material — the cel-shaded look. */
 function useToonGradientMap() {
   return useMemo(() => {
@@ -171,26 +151,26 @@ function useToonGradientMap() {
 const scratchSolid = new Color()
 const scratchOutline = new Color()
 
+/**
+ * The knot and the line are two separate, static meshes (normals computed
+ * once, never touched again) that simply cross-fade opacity as `morph`
+ * rises. This replaced a per-vertex geometry morph that recomputed vertex
+ * normals on a ~6000-vertex tube every single frame — the actual cause of
+ * the janky "unraveling" — with something the GPU/CPU barely notices.
+ */
 function Knot() {
   const rig = useRef<Group>(null)
   const spin = useRef<Group>(null)
-  const solid = useRef<Mesh>(null)
-  const outline = useRef<Mesh>(null)
+  const knotSolid = useRef<Mesh>(null)
+  const knotOutline = useRef<Mesh>(null)
+  const lineSolid = useRef<Mesh>(null)
+  const lineOutline = useRef<Mesh>(null)
   const morph = useRef(0)
   const quietWorldY = useRef(-0.8)
   const quietSample = useRef(0)
   const gradientMap = useToonGradientMap()
-  const { geometry, knotPositions, linePositions } = useMemo(() => {
-    const knot = makeTube(new KnotPath())
-    const line = makeTube(new LinePath())
-    const geometry = knot.clone()
-
-    return {
-      geometry,
-      knotPositions: knot.getAttribute('position') as BufferAttribute,
-      linePositions: line.getAttribute('position') as BufferAttribute,
-    }
-  }, [])
+  const knotGeometry = useMemo(() => makeTube(new KnotPath()), [])
+  const lineGeometry = useMemo(() => makeTube(new LinePath()), [])
 
   useFrame((state, delta) => {
     const max = document.documentElement.scrollHeight - window.innerHeight
@@ -221,7 +201,6 @@ function Knot() {
     }
 
     morph.current += (k.m - morph.current) * 0.045
-    updateMorphGeometry(geometry, knotPositions, linePositions, morph.current)
 
     if (spin.current) {
       const knotness = 1 - morph.current
@@ -232,22 +211,38 @@ function Knot() {
     }
 
     const { paperRgb, accentRgb, inkRgb, dev } = scrollState.palette
-    const solidMat = solid.current?.material as MeshToonMaterial | undefined
-    if (solidMat) {
-      solidMat.opacity += (k.o - solidMat.opacity) * 0.07
-      scratchSolid.setRGB(
-        paperRgb[0] + (accentRgb[0] - paperRgb[0]) * dev * 0.65,
-        paperRgb[1] + (accentRgb[1] - paperRgb[1]) * dev * 0.65,
-        paperRgb[2] + (accentRgb[2] - paperRgb[2]) * dev * 0.65,
-      )
-      solidMat.color.copy(scratchSolid)
-      solidMat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15)
+    scratchSolid.setRGB(
+      paperRgb[0] + (accentRgb[0] - paperRgb[0]) * dev * 0.65,
+      paperRgb[1] + (accentRgb[1] - paperRgb[1]) * dev * 0.65,
+      paperRgb[2] + (accentRgb[2] - paperRgb[2]) * dev * 0.65,
+    )
+    scratchOutline.setRGB(inkRgb[0], inkRgb[1], inkRgb[2])
+
+    const knotOpacityTarget = k.o * (1 - lineAmount)
+    const lineOpacityTarget = k.o * lineAmount
+
+    const knotMat = knotSolid.current?.material as MeshToonMaterial | undefined
+    if (knotMat) {
+      knotMat.opacity += (knotOpacityTarget - knotMat.opacity) * 0.08
+      knotMat.color.copy(scratchSolid)
+      knotMat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15)
     }
-    const outlineMat = outline.current?.material as MeshBasicMaterial | undefined
-    if (outlineMat && solidMat) {
-      outlineMat.opacity = solidMat.opacity * 0.85
-      scratchOutline.setRGB(inkRgb[0], inkRgb[1], inkRgb[2])
-      outlineMat.color.copy(scratchOutline)
+    const knotOutlineMat = knotOutline.current?.material as MeshBasicMaterial | undefined
+    if (knotOutlineMat && knotMat) {
+      knotOutlineMat.opacity = knotMat.opacity * 0.85
+      knotOutlineMat.color.copy(scratchOutline)
+    }
+
+    const lineMat = lineSolid.current?.material as MeshToonMaterial | undefined
+    if (lineMat) {
+      lineMat.opacity += (lineOpacityTarget - lineMat.opacity) * 0.08
+      lineMat.color.copy(scratchSolid)
+      lineMat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15)
+    }
+    const lineOutlineMat = lineOutline.current?.material as MeshBasicMaterial | undefined
+    if (lineOutlineMat && lineMat) {
+      lineOutlineMat.opacity = lineMat.opacity * 0.85
+      lineOutlineMat.color.copy(scratchOutline)
     }
   })
 
@@ -255,11 +250,17 @@ function Knot() {
     <group ref={rig}>
       <Float speed={1.3} rotationIntensity={0.5} floatIntensity={1}>
         <group ref={spin}>
-          <mesh ref={solid} geometry={geometry}>
-            <meshToonMaterial gradientMap={gradientMap} transparent opacity={0.95} />
+          <mesh ref={knotSolid} geometry={knotGeometry}>
+            <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
           </mesh>
-          <mesh ref={outline} geometry={geometry} scale={1.025}>
-            <meshBasicMaterial side={BackSide} transparent opacity={0.5} />
+          <mesh ref={knotOutline} geometry={knotGeometry} scale={1.025}>
+            <meshBasicMaterial side={BackSide} transparent opacity={0} />
+          </mesh>
+          <mesh ref={lineSolid} geometry={lineGeometry}>
+            <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
+          </mesh>
+          <mesh ref={lineOutline} geometry={lineGeometry} scale={1.025}>
+            <meshBasicMaterial side={BackSide} transparent opacity={0} />
           </mesh>
         </group>
       </Float>
