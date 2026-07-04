@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --color-ink: #0b0b0c;
+  --color-paper: #f2efe9;
+  --color-muted: #8a867f;
+  --color-line: rgba(242, 239, 233, 0.14);
+  --color-amber: #e8a33d;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-amber);
+  color: var(--color-ink);
+}
+
+/* scroll-reveal primitives */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* custom cursor */
+.cursor-none,
+.cursor-none * {
+  cursor: none !important;
+}
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 9999;
+  border-radius: 9999px;
+  mix-blend-mode: difference;
+  will-change: transform;
+}
+.cursor-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--color-amber);
+}
+.cursor-ring {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-paper);
+  transition: width 0.25s ease, height 0.25s ease, background-color 0.25s ease, opacity 0.25s ease;
+}
+.cursor-ring.is-hover {
+  width: 64px;
+  height: 64px;
+  background: rgba(242, 239, 233, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
