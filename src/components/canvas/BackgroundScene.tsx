@@ -157,7 +157,9 @@ function updateMorphGeometry(
 /** 3-step gradient map for the toon material — the cel-shaded look. */
 function useToonGradientMap() {
   return useMemo(() => {
-    const data = new Uint8Array([80, 170, 255])
+    // 5 steps (vs. the usual 3) so a thin round tube still reads as
+    // rounded instead of flattening into a ribbon under toon shading.
+    const data = new Uint8Array([40, 105, 165, 210, 255])
     const texture = new DataTexture(data, data.length, 1, RedFormat)
     texture.minFilter = NearestFilter
     texture.magFilter = NearestFilter
@@ -448,8 +450,10 @@ function FinaleBloom() {
 function Lights() {
   return (
     <>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[4, 5, 5]} intensity={1.1} />
+      <ambientLight intensity={0.3} />
+      <pointLight position={[3.5, 2.5, 4]} intensity={45} />
+      <pointLight position={[-4, -2, -3]} intensity={20} />
+      <directionalLight position={[2, 4, 6]} intensity={0.5} />
     </>
   )
 }
