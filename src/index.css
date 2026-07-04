@@ -139,35 +139,36 @@ body {
 /* side rail */
 .side-rail {
   position: fixed;
-  left: 1.25rem;
-  top: 50%;
+  left: 1.5rem;
+  bottom: 1.75rem;
   z-index: 40;
   display: none;
   align-items: center;
-  gap: 0.85rem;
-  transform: translateY(-50%);
+  gap: 0.6rem;
   color: var(--color-muted);
+  opacity: 0.6;
+  pointer-events: none;
+  mix-blend-mode: difference;
 }
 .side-rail-track {
   position: relative;
-  width: 1px;
-  height: 7rem;
+  width: 2rem;
+  height: 1px;
   background: var(--color-line);
   overflow: hidden;
 }
 .side-rail-fill {
   position: absolute;
-  inset: auto 0 0 0;
-  width: 100%;
+  inset: 0 auto 0 0;
+  height: 100%;
   background: var(--color-amber);
-  transform-origin: bottom;
+  transform-origin: left;
   transition: background-color 0.4s ease;
 }
 .side-rail-text {
-  writing-mode: vertical-rl;
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   white-space: nowrap;
 }
