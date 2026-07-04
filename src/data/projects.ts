@@ -7,6 +7,7 @@ export interface CaseStudy {
   url: string
   linkLabel: string
   year: string
+  accent: 'surge' | 'laffy'
 }
 
 export const CASE_STUDIES: CaseStudy[] = [
@@ -20,6 +21,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     url: 'https://surge-chi-khaki.vercel.app',
     linkLabel: 'Visit Surge',
     year: '2026',
+    accent: 'surge',
   },
   {
     index: '02',
@@ -31,5 +33,6 @@ export const CASE_STUDIES: CaseStudy[] = [
     url: 'https://laffyfinal.vercel.app/',
     linkLabel: 'Visit Laffy',
     year: '2026',
+    accent: 'laffy',
   },
 ]
