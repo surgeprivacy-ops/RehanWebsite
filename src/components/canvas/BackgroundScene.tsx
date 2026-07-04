@@ -42,11 +42,10 @@ const CAMERA_FOV = 45
 type Waypoint = { at: number; x: number; y: number; s: number; o: number; m: number }
 const WAYPOINTS: Waypoint[] = [
   { at: 0.0, x: 2.55, y: 0.0, s: 1.08, o: 0.9, m: 0 }, // hero: full knot, right side
-  { at: 0.18, x: 2.05, y: -0.15, s: 1.02, o: 0.68, m: 0.14 }, // loosens slowly
-  { at: 0.34, x: 1.35, y: -0.98, s: 0.86, o: 0.34, m: 0.62 }, // chapters: halfway into line
-  { at: 0.48, x: 1.25, y: -0.95, s: 0.58, o: 0.1, m: 1 }, // work: straight, subtle
-  { at: 0.66, x: 1.45, y: -0.9, s: 0.56, o: 0.09, m: 1 }, // drifts through whitespace
-  { at: 0.8, x: 1.1, y: -1.18, s: 0.68, o: 0.15, m: 0.86 }, // starts tying back together
+  { at: 0.1, x: 1.9, y: -0.4, s: 0.94, o: 0.5, m: 0.3 }, // loosens quickly — page is shorter now
+  { at: 0.22, x: 1.3, y: -0.9, s: 0.6, o: 0.12, m: 1 }, // work: straight, subtle
+  { at: 0.55, x: 1.45, y: -0.9, s: 0.56, o: 0.09, m: 1 }, // drifts through whitespace
+  { at: 0.78, x: 1.1, y: -1.1, s: 0.7, o: 0.18, m: 0.75 }, // starts tying back together
   { at: 0.92, x: 1.1, y: -0.72, s: 0.88, o: 0.28, m: 0.38 }, // reforms before footer
   { at: 1.0, x: 1.45, y: -0.42, s: 0.95, o: 0.42, m: 0 }, // footer: knot returns, rose, in the flood
 ]

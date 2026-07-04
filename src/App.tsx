@@ -12,33 +12,6 @@ import MobileKnot from './components/ui/MobileKnot'
 import ColorDirector from './components/ColorDirector'
 import BackgroundCanvas from './components/canvas/BackgroundCanvas'
 
-const CHAPTERS = [
-  {
-    number: '01',
-    label: 'Build',
-    title: 'Start from the working path, not the pitch deck.',
-    body: 'Every project begins with the smallest real version: the interface, the model boundary, the data shape, and a user who can actually try it.',
-  },
-  {
-    number: '02',
-    label: 'Test',
-    title: 'Separate signal from theatre.',
-    body: 'AI output, user intent, and measured results stay clearly labeled instead of blurred together into a demo that only works once.',
-  },
-  {
-    number: '03',
-    label: 'Polish',
-    title: 'Make the product feel inevitable.',
-    body: 'Motion, typography, copy, and edge states exist to build trust — not to make the same idea look louder.',
-  },
-  {
-    number: '04',
-    label: 'Ship',
-    title: 'Close the loop in public.',
-    body: 'The goal is never a demo trapped on a laptop. It is a real URL, a working path, and enough care to survive first contact.',
-  },
-]
-
 function Nav() {
   return (
     <nav className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-4 px-4 py-4 bg-ink/80 backdrop-blur-md border-b border-line sm:px-6 md:px-12 md:py-5">
@@ -95,40 +68,9 @@ function Hero() {
   )
 }
 
-function Chapters() {
-  return (
-    <section aria-label="How the work holds together">
-      {CHAPTERS.map((chapter, i) => (
-        <div
-          key={chapter.number}
-          data-act="chapter"
-          data-act-progress={String(0.18 + (i / (CHAPTERS.length - 1)) * 0.32)}
-          className="chapter-section"
-        >
-          <div className="chapter-frame">
-            <div className="mega-type-layer" aria-hidden="true">
-              <span
-                className="mega-type chapter-number-bg"
-                style={{ bottom: '-6%', right: i % 2 === 0 ? '4%' : 'auto', left: i % 2 === 1 ? '4%' : 'auto' }}
-              >
-                {chapter.number}
-              </span>
-            </div>
-            <div className="chapter-body">
-              <p className="chapter-label">{chapter.label}</p>
-              <h3 className="chapter-title">{chapter.title}</h3>
-              <p className="chapter-copy">{chapter.body}</p>
-            </div>
-          </div>
-        </div>
-      ))}
-    </section>
-  )
-}
-
 function Work() {
   return (
-    <section id="work" data-act="work" data-act-progress="0.7" className="border-t border-line">
+    <section id="work" data-act="work" data-act-progress="0.45" className="border-t border-line">
       {CASE_STUDIES.map((p) => (
         <article
           key={p.name}
@@ -230,7 +172,6 @@ export default function App() {
       <div className="content-layer">
         <Nav />
         <Hero />
-        <Chapters />
         <Work />
         <Footer />
       </div>
