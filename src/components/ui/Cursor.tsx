@@ -11,6 +11,7 @@ export default function Cursor() {
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
   const dotRef = useRef<HTMLDivElement>(null)
   const ringRef = useRef<HTMLDivElement>(null)
+  const labelRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     if (!finePointer || reduced) return
@@ -33,10 +34,12 @@ export default function Cursor() {
     }
 
     const onOver = (e: MouseEvent) => {
-      const interactive = (e.target as HTMLElement).closest(
-        'a, button, [data-cursor="hover"]',
-      )
-      ring.classList.toggle('is-hover', !!interactive)
+      const target = e.target as HTMLElement
+      const labeled = target.closest<HTMLElement>('[data-cursor-label]')
+      const interactive = target.closest('a, button, [data-cursor="hover"]')
+      ring.classList.toggle('is-hover', !!interactive && !labeled)
+      ring.classList.toggle('has-label', !!labeled)
+      if (labelRef.current) labelRef.current.textContent = labeled?.dataset.cursorLabel ?? ''
     }
 
     const onLeave = () => {
@@ -75,7 +78,9 @@ export default function Cursor() {
 
   return (
     <>
-      <div ref={ringRef} className="cursor-ring" aria-hidden="true" />
+      <div ref={ringRef} className="cursor-ring" aria-hidden="true">
+        <span ref={labelRef} className="cursor-ring-label" />
+      </div>
       <div ref={dotRef} className="cursor-dot" aria-hidden="true" />
     </>
   )
