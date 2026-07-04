@@ -251,13 +251,13 @@ body {
   color: var(--card-accent);
 }
 
-/* mobile SVG knot stand-in */
+/* flat SVG knot — fallback for when WebGL is unavailable or motion is reduced */
 .mobile-knot-wrap {
-  position: absolute;
-  right: -3rem;
-  bottom: 4rem;
-  width: 14rem;
-  height: 14rem;
+  position: fixed;
+  right: -2rem;
+  bottom: 3rem;
+  width: 12rem;
+  height: 12rem;
   opacity: 0.5;
   pointer-events: none;
 }
@@ -303,9 +303,6 @@ html.is-flooded nav {
 @media (min-width: 1024px) {
   .side-rail {
     display: flex;
-  }
-  .mobile-knot-wrap {
-    display: none;
   }
 }
 

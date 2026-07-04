@@ -41,13 +41,13 @@ const CAMERA_FOV = 45
  */
 type Waypoint = { at: number; x: number; y: number; s: number; o: number; m: number }
 const WAYPOINTS: Waypoint[] = [
-  { at: 0.0, x: 2.55, y: 0.0, s: 1.08, o: 0.9, m: 0 }, // hero: full knot, right side
-  { at: 0.1, x: 1.9, y: -0.4, s: 0.94, o: 0.5, m: 0.3 }, // loosens quickly — page is shorter now
-  { at: 0.22, x: 1.3, y: -0.9, s: 0.6, o: 0.12, m: 1 }, // work: straight, subtle
-  { at: 0.55, x: 1.45, y: -0.9, s: 0.56, o: 0.09, m: 1 }, // drifts through whitespace
-  { at: 0.78, x: 1.1, y: -1.1, s: 0.7, o: 0.18, m: 0.75 }, // starts tying back together
-  { at: 0.92, x: 1.1, y: -0.72, s: 0.88, o: 0.28, m: 0.38 }, // reforms before footer
-  { at: 1.0, x: 1.45, y: -0.42, s: 0.95, o: 0.42, m: 0 }, // footer: knot returns, rose, in the flood
+  { at: 0.0, x: 2.55, y: 0.0, s: 1.28, o: 0.95, m: 0 }, // hero: full knot, right side, front and center
+  { at: 0.1, x: 1.9, y: -0.4, s: 1.05, o: 0.6, m: 0.3 }, // loosens quickly — page is shorter now
+  { at: 0.22, x: 1.3, y: -0.9, s: 0.85, o: 0.4, m: 1 }, // work: straight, but still clearly present
+  { at: 0.55, x: 1.45, y: -0.9, s: 0.8, o: 0.36, m: 1 }, // drifts through whitespace
+  { at: 0.78, x: 1.1, y: -1.1, s: 0.92, o: 0.42, m: 0.75 }, // starts tying back together
+  { at: 0.92, x: 1.1, y: -0.72, s: 1.0, o: 0.5, m: 0.38 }, // reforms before footer
+  { at: 1.0, x: 1.45, y: -0.42, s: 1.15, o: 0.58, m: 0 }, // footer: knot returns, rose, in the flood
 ]
 
 function sample(p: number): Omit<Waypoint, 'at'> {
@@ -129,8 +129,8 @@ class LinePath extends Curve<Vector3> {
   }
 }
 
-function makeTube(path: Curve<Vector3>) {
-  return new TubeGeometry(path, 240, 0.16, 24, true)
+function makeTube(path: Curve<Vector3>, lite: boolean) {
+  return lite ? new TubeGeometry(path, 120, 0.16, 12, true) : new TubeGeometry(path, 240, 0.16, 24, true)
 }
 
 /** 3-step gradient map for the toon material — the cel-shaded look. */
@@ -157,7 +157,7 @@ const scratchOutline = new Color()
  * normals on a ~6000-vertex tube every single frame — the actual cause of
  * the janky "unraveling" — with something the GPU/CPU barely notices.
  */
-function Knot() {
+function Knot({ lite }: { lite: boolean }) {
   const rig = useRef<Group>(null)
   const spin = useRef<Group>(null)
   const knotSolid = useRef<Mesh>(null)
@@ -168,8 +168,8 @@ function Knot() {
   const quietWorldY = useRef(-0.8)
   const quietSample = useRef(0)
   const gradientMap = useToonGradientMap()
-  const knotGeometry = useMemo(() => makeTube(new KnotPath()), [])
-  const lineGeometry = useMemo(() => makeTube(new LinePath()), [])
+  const knotGeometry = useMemo(() => makeTube(new KnotPath(), lite), [lite])
+  const lineGeometry = useMemo(() => makeTube(new LinePath(), lite), [lite])
 
   useFrame((state, delta) => {
     const max = document.documentElement.scrollHeight - window.innerHeight
@@ -458,18 +458,18 @@ function Lights() {
   )
 }
 
-export default function BackgroundScene() {
+export default function BackgroundScene({ lite = false }: { lite?: boolean }) {
   return (
     <Canvas
-      dpr={[1, 1.5]}
+      dpr={lite ? [1, 1] : [1, 1.5]}
       camera={{ position: [0, 0, 5.5], fov: 45 }}
-      gl={{ antialias: true, alpha: true }}
+      gl={{ antialias: !lite, alpha: true }}
       onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
     >
       <Lights />
-      <Knot />
-      <Companion />
-      <DebrisCorridor />
+      <Knot lite={lite} />
+      {!lite && <Companion />}
+      {!lite && <DebrisCorridor />}
       <FinaleBloom />
     </Canvas>
   )

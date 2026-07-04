@@ -8,7 +8,6 @@ import ScrollProgress from './components/ui/ScrollProgress'
 import SideRail from './components/ui/SideRail'
 import ScrollHint from './components/ui/ScrollHint'
 import Preloader from './components/ui/Preloader'
-import MobileKnot from './components/ui/MobileKnot'
 import ColorDirector from './components/ColorDirector'
 import BackgroundCanvas from './components/canvas/BackgroundCanvas'
 
@@ -47,7 +46,6 @@ function Hero() {
           PORTFOLIO
         </span>
       </div>
-      <MobileKnot />
       <p className="reveal relative z-[2] mb-8 text-sm tracking-[0.2em] uppercase text-muted sm:tracking-[0.25em]">
         Engineer — AI-native products
       </p>
@@ -165,8 +163,8 @@ export default function App() {
       <ColorDirector />
       <Cursor />
       <SideRail />
-      {/* traveling 3D world — fixed between the mega-type layer and content, desktop only */}
-      <div className="canvas-layer hidden lg:block">
+      {/* traveling 3D world — fixed between the mega-type layer and content, all viewports */}
+      <div className="canvas-layer">
         <BackgroundCanvas />
       </div>
       <div className="content-layer">
