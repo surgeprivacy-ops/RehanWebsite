@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Float } from '@react-three/drei'
 import {
@@ -41,13 +41,13 @@ const CAMERA_FOV = 45
  */
 type Waypoint = { at: number; x: number; y: number; s: number; o: number; m: number }
 const WAYPOINTS: Waypoint[] = [
-  { at: 0.0, x: 2.55, y: 0.0, s: 1.28, o: 0.95, m: 0 }, // hero: full knot, right side, front and center
-  { at: 0.1, x: 1.9, y: -0.4, s: 1.05, o: 0.6, m: 0.3 }, // loosens quickly — page is shorter now
-  { at: 0.22, x: 1.3, y: -0.9, s: 0.85, o: 0.4, m: 1 }, // work: straight, but still clearly present
-  { at: 0.55, x: 1.45, y: -0.9, s: 0.8, o: 0.36, m: 1 }, // drifts through whitespace
-  { at: 0.78, x: 1.1, y: -1.1, s: 0.92, o: 0.42, m: 0.75 }, // starts tying back together
-  { at: 0.92, x: 1.1, y: -0.72, s: 1.0, o: 0.5, m: 0.38 }, // reforms before footer
-  { at: 1.0, x: 1.45, y: -0.42, s: 1.15, o: 0.58, m: 0 }, // footer: knot returns, rose, in the flood
+  { at: 0.0, x: 2.55, y: 0.0, s: 1.28, o: 0.95, m: 0 }, // hero: full circle, right side, front and center
+  { at: 0.1, x: 1.9, y: -0.4, s: 1.05, o: 0.85, m: 0.3 }, // begins unraveling into the line
+  { at: 0.22, x: 1.3, y: -0.9, s: 0.85, o: 0.78, m: 1 }, // work: fully a line now, still clearly visible
+  { at: 0.55, x: 1.45, y: -0.9, s: 0.8, o: 0.75, m: 1 }, // drifts through whitespace, staying present
+  { at: 0.78, x: 1.1, y: -1.1, s: 0.92, o: 0.8, m: 0.75 }, // starts tying back together
+  { at: 0.92, x: 1.1, y: -0.72, s: 1.0, o: 0.85, m: 0.38 }, // reforms before footer
+  { at: 1.0, x: 1.45, y: -0.42, s: 1.15, o: 0.92, m: 0 }, // footer: circle returns, rose, in the flood
 ]
 
 function sample(p: number): Omit<Waypoint, 'at'> {
@@ -125,6 +125,24 @@ function makeTube(path: Curve<Vector3>, lite: boolean) {
   return lite ? new TubeGeometry(path, 120, 0.16, 12, true) : new TubeGeometry(path, 240, 0.16, 24, true)
 }
 
+/**
+ * A single geometry that actually unravels: the circle tube's position/normal
+ * attributes are the base, and the line tube's attributes (same vertex count —
+ * both are TubeGeometry built with identical segment counts) are set as a
+ * morph target. Setting morphTargetInfluences[0] on the mesh each frame lets
+ * the GPU interpolate every vertex, so the shape visibly straightens out
+ * instead of one mesh fading in as another fades out.
+ */
+function buildCircleToLineGeometry(lite: boolean) {
+  const circle = makeTube(new CirclePath(), lite)
+  const line = makeTube(new LinePath(), lite)
+  circle.morphAttributes.position = [line.attributes.position]
+  if (circle.attributes.normal && line.attributes.normal) {
+    circle.morphAttributes.normal = [line.attributes.normal]
+  }
+  return circle
+}
+
 /** 3-step gradient map for the toon material — the cel-shaded look. */
 function useToonGradientMap() {
   return useMemo(() => {
@@ -144,27 +162,27 @@ const scratchOutline = new Color()
 const scratchProjectAccent = new Color()
 
 /**
- * The knot and the line are two separate, static meshes (normals computed
- * once, never touched again) that simply cross-fade opacity as `morph`
- * rises. This replaced a per-vertex geometry morph that recomputed vertex
- * normals on a ~6000-vertex tube every single frame — the actual cause of
- * the janky "unraveling" — with something the GPU/CPU barely notices.
+ * A single shape that genuinely unravels from a circle into a line as the
+ * page scrolls — a GPU morph target, not a cross-fade between two meshes —
+ * so it stays visibly the same object the whole time, just changing form.
  */
 function Knot({ lite }: { lite: boolean }) {
   const rig = useRef<Group>(null)
   const spin = useRef<Group>(null)
-  const knotSolid = useRef<Mesh>(null)
-  const knotOutline = useRef<Mesh>(null)
-  const lineSolid = useRef<Mesh>(null)
-  const lineOutline = useRef<Mesh>(null)
+  const solid = useRef<Mesh>(null)
+  const outline = useRef<Mesh>(null)
   const morph = useRef(0)
   const quietWorldY = useRef(-0.8)
   const quietSample = useRef(0)
   const surgeMix = useRef(0)
   const laffyMix = useRef(0)
   const gradientMap = useToonGradientMap()
-  const knotGeometry = useMemo(() => makeTube(new CirclePath(), lite), [lite])
-  const lineGeometry = useMemo(() => makeTube(new LinePath(), lite), [lite])
+  const geometry = useMemo(() => buildCircleToLineGeometry(lite), [lite])
+
+  useEffect(() => {
+    solid.current?.updateMorphTargets()
+    outline.current?.updateMorphTargets()
+  }, [geometry])
 
   useFrame((state, delta) => {
     const max = document.documentElement.scrollHeight - window.innerHeight
@@ -195,6 +213,9 @@ function Knot({ lite }: { lite: boolean }) {
     }
 
     morph.current += (k.m - morph.current) * 0.045
+
+    if (solid.current?.morphTargetInfluences) solid.current.morphTargetInfluences[0] = lineAmount
+    if (outline.current?.morphTargetInfluences) outline.current.morphTargetInfluences[0] = lineAmount
 
     // Each project's pinned story gives the knot a distinct temperament:
     // Surge (analytical, review/test) spins faster and cooler; Laffy
@@ -227,31 +248,16 @@ function Knot({ lite }: { lite: boolean }) {
     }
     scratchOutline.setRGB(inkRgb[0], inkRgb[1], inkRgb[2])
 
-    const knotOpacityTarget = k.o * (1 - lineAmount)
-    const lineOpacityTarget = k.o * lineAmount
-
-    const knotMat = knotSolid.current?.material as MeshToonMaterial | undefined
-    if (knotMat) {
-      knotMat.opacity += (knotOpacityTarget - knotMat.opacity) * 0.08
-      knotMat.color.copy(scratchSolid)
-      knotMat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15)
+    const mat = solid.current?.material as MeshToonMaterial | undefined
+    if (mat) {
+      mat.opacity += (k.o - mat.opacity) * 0.08
+      mat.color.copy(scratchSolid)
+      mat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15)
     }
-    const knotOutlineMat = knotOutline.current?.material as MeshBasicMaterial | undefined
-    if (knotOutlineMat && knotMat) {
-      knotOutlineMat.opacity = knotMat.opacity * 0.85
-      knotOutlineMat.color.copy(scratchOutline)
-    }
-
-    const lineMat = lineSolid.current?.material as MeshToonMaterial | undefined
-    if (lineMat) {
-      lineMat.opacity += (lineOpacityTarget - lineMat.opacity) * 0.08
-      lineMat.color.copy(scratchSolid)
-      lineMat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15)
-    }
-    const lineOutlineMat = lineOutline.current?.material as MeshBasicMaterial | undefined
-    if (lineOutlineMat && lineMat) {
-      lineOutlineMat.opacity = lineMat.opacity * 0.85
-      lineOutlineMat.color.copy(scratchOutline)
+    const outlineMat = outline.current?.material as MeshBasicMaterial | undefined
+    if (outlineMat && mat) {
+      outlineMat.opacity = mat.opacity * 0.85
+      outlineMat.color.copy(scratchOutline)
     }
   })
 
@@ -259,16 +265,10 @@ function Knot({ lite }: { lite: boolean }) {
     <group ref={rig}>
       <Float speed={1.3} rotationIntensity={0.5} floatIntensity={1}>
         <group ref={spin}>
-          <mesh ref={knotSolid} geometry={knotGeometry}>
+          <mesh ref={solid} geometry={geometry}>
             <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
           </mesh>
-          <mesh ref={knotOutline} geometry={knotGeometry} scale={1.025}>
-            <meshBasicMaterial side={BackSide} transparent opacity={0} />
-          </mesh>
-          <mesh ref={lineSolid} geometry={lineGeometry}>
-            <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
-          </mesh>
-          <mesh ref={lineOutline} geometry={lineGeometry} scale={1.025}>
+          <mesh ref={outline} geometry={geometry} scale={1.025}>
             <meshBasicMaterial side={BackSide} transparent opacity={0} />
           </mesh>
         </group>
