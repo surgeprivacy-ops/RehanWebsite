@@ -247,8 +247,15 @@ function Knot({ lite }: { lite: boolean }) {
       rig.current.position.y += (targetY - rig.current.position.y) * 0.045
       const s = rig.current.scale.x + (k.s - rig.current.scale.x) * 0.07
       rig.current.scale.setScalar(s)
-      const targetRotY = state.pointer.x * 0.5 * (1 - lineAmount * 0.7)
-      const targetRotX = state.pointer.y * -0.3 * (1 - lineAmount * 0.7)
+      // The coil is flat (z=0 always) and grows much wider as it opens, so any
+      // cursor tilt beyond the compact-circle state turns part of the ring
+      // edge-on to the camera and foreshortens it into what looks like a
+      // separate thin line. Kill the tilt fast, well before the ring has
+      // opened up much, instead of just tapering it — a subtle amount at the
+      // fully-closed circle is fine, any amount on a wide-open arc isn't.
+      const tiltFalloff = Math.max(0, 1 - lineAmount * 3)
+      const targetRotY = state.pointer.x * 0.5 * tiltFalloff
+      const targetRotX = state.pointer.y * -0.3 * tiltFalloff
       rig.current.rotation.y += (targetRotY - rig.current.rotation.y) * 0.05
       rig.current.rotation.x += (targetRotX - rig.current.rotation.x) * 0.05
     }
