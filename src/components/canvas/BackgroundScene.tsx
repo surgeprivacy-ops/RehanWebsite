@@ -98,26 +98,47 @@ function chooseQuietWorldY() {
   return screenYToWorld(best.y)
 }
 
-/** A plain circle — the traveling shape, simplified down from a torus knot. */
-class CirclePath extends Curve<Vector3> {
-  constructor() {
-    super()
-  }
+const CIRCLE_RADIUS = 1.3
+/** Circumference of the m=0 circle — kept as the line's length too, so the
+ *  tube's own arc length never stretches or compresses as it opens up. */
+const COIL_LENGTH = CIRCLE_RADIUS * Math.PI * 2
 
-  getPoint(t: number) {
-    const radius = 1.3
-    const u = t * Math.PI * 2
-    return new Vector3(radius * Math.cos(u), radius * Math.sin(u), 0)
+/**
+ * A point on the "opening coil" family: at m=0 this traces an exact circle of
+ * radius CIRCLE_RADIUS; at m=1 it's an exact straight line of length
+ * COIL_LENGTH; in between it's a circular arc of constant arc length that
+ * widens its angular span down to 0 as m rises — literally the shape you'd
+ * get by holding a loop of wire and progressively straightening it, not a
+ * per-vertex lerp between two unrelated shapes (which looks like the ends
+ * sliding through each other rather than uncurling).
+ */
+function unrollPoint(t: number, m: number, out: Vector3) {
+  const totalAngle = (1 - m) * Math.PI * 2
+  if (totalAngle < 1e-3) {
+    out.set((t - 0.5) * COIL_LENGTH, 0, 0)
+    return out
   }
+  const radius = COIL_LENGTH / totalAngle
+  const angle = (t - 0.5) * totalAngle
+  const half = totalAngle / 2
+  // Shift so the shape stays centered on the local origin at every m (not
+  // just at the endpoints) — otherwise the spin group, which rotates around
+  // local origin, would make the coil visibly orbit instead of spin in place.
+  const shift = (radius * (1 - Math.cos(half))) / 2
+  out.set(radius * Math.sin(angle), radius * (1 - Math.cos(angle)) - shift, 0)
+  return out
 }
 
-class LinePath extends Curve<Vector3> {
-  constructor() {
+class UnrollPath extends Curve<Vector3> {
+  m: number
+
+  constructor(m: number) {
     super()
+    this.m = m
   }
 
   getPoint(t: number) {
-    return new Vector3((t - 0.5) * 5.4, 0, 0)
+    return unrollPoint(t, this.m, new Vector3())
   }
 }
 
@@ -125,22 +146,41 @@ function makeTube(path: Curve<Vector3>, lite: boolean) {
   return lite ? new TubeGeometry(path, 120, 0.16, 12, true) : new TubeGeometry(path, 240, 0.16, 24, true)
 }
 
+const MORPH_STOPS = [1 / 3, 2 / 3, 1]
+
 /**
- * A single geometry that actually unravels: the circle tube's position/normal
- * attributes are the base, and the line tube's attributes (same vertex count —
- * both are TubeGeometry built with identical segment counts) are set as a
- * morph target. Setting morphTargetInfluences[0] on the mesh each frame lets
- * the GPU interpolate every vertex, so the shape visibly straightens out
- * instead of one mesh fading in as another fades out.
+ * The base geometry is the m=0 circle; the three morph targets are keyframes
+ * along the opening-coil curve at m=1/3, 2/3, 1. Blending two adjacent
+ * keyframes (or base→first keyframe) via morphTargetInfluences each frame
+ * gives a GPU-driven, per-vertex-correct approximation of the continuous
+ * unroll — cheap (static precomputed buffers, no per-frame CPU geometry
+ * work) while still looking like the coil is actually uncurling.
  */
-function buildCircleToLineGeometry(lite: boolean) {
-  const circle = makeTube(new CirclePath(), lite)
-  const line = makeTube(new LinePath(), lite)
-  circle.morphAttributes.position = [line.attributes.position]
-  if (circle.attributes.normal && line.attributes.normal) {
-    circle.morphAttributes.normal = [line.attributes.normal]
+function buildUnrollGeometry(lite: boolean) {
+  const base = makeTube(new UnrollPath(0), lite)
+  const targets = MORPH_STOPS.map((m) => makeTube(new UnrollPath(m), lite))
+  base.morphAttributes.position = targets.map((g) => g.attributes.position)
+  if (base.attributes.normal && targets.every((g) => g.attributes.normal)) {
+    base.morphAttributes.normal = targets.map((g) => g.attributes.normal)
   }
-  return circle
+  return base
+}
+
+/** Sets the two morphTargetInfluences that bracket `m` so the mesh sits exactly at the right point along the unroll. */
+function applyUnrollInfluence(mesh: Mesh | null, m: number) {
+  const inf = mesh?.morphTargetInfluences
+  if (!inf) return
+  for (let i = 0; i < inf.length; i++) inf[i] = 0
+  if (m <= 0) return
+  const stops = MORPH_STOPS.length
+  const idx = Math.min(stops - 1, Math.floor(m * stops))
+  const localT = m * stops - idx
+  if (idx === 0) {
+    inf[0] = localT
+  } else {
+    inf[idx - 1] = 1 - localT
+    inf[idx] = localT
+  }
 }
 
 /** 3-step gradient map for the toon material — the cel-shaded look. */
@@ -162,9 +202,10 @@ const scratchOutline = new Color()
 const scratchProjectAccent = new Color()
 
 /**
- * A single shape that genuinely unravels from a circle into a line as the
- * page scrolls — a GPU morph target, not a cross-fade between two meshes —
- * so it stays visibly the same object the whole time, just changing form.
+ * A single shape that genuinely uncoils from a circle into a line as the
+ * page scrolls, via the opening-coil morph targets above — not a cross-fade
+ * between two meshes, and not a raw per-vertex lerp between unrelated
+ * shapes (which looks like the shape imploding rather than unraveling).
  */
 function Knot({ lite }: { lite: boolean }) {
   const rig = useRef<Group>(null)
@@ -177,7 +218,7 @@ function Knot({ lite }: { lite: boolean }) {
   const surgeMix = useRef(0)
   const laffyMix = useRef(0)
   const gradientMap = useToonGradientMap()
-  const geometry = useMemo(() => buildCircleToLineGeometry(lite), [lite])
+  const geometry = useMemo(() => buildUnrollGeometry(lite), [lite])
 
   useEffect(() => {
     solid.current?.updateMorphTargets()
@@ -214,8 +255,8 @@ function Knot({ lite }: { lite: boolean }) {
 
     morph.current += (k.m - morph.current) * 0.045
 
-    if (solid.current?.morphTargetInfluences) solid.current.morphTargetInfluences[0] = lineAmount
-    if (outline.current?.morphTargetInfluences) outline.current.morphTargetInfluences[0] = lineAmount
+    applyUnrollInfluence(solid.current, lineAmount)
+    applyUnrollInfluence(outline.current, lineAmount)
 
     // Each project's pinned story gives the knot a distinct temperament:
     // Surge (analytical, review/test) spins faster and cooler; Laffy
