@@ -16,7 +16,7 @@ export const CASE_STUDIES: CaseStudy[] = [
   {
     index: '01',
     name: 'Surge',
-    tagline: 'Review. Test. Improve.',
+    tagline: 'Test. Review. Post.',
     description:
       'An AI-assisted craft review platform for short-form video. Creators upload a cut before posting and get a retention-focused analysis — hook, pacing, text, tension, sync, ending — plus one editing hypothesis to test in the next version.',
     stack: ['FastAPI', 'React', 'Neon Postgres', 'Gemini', 'Stripe'],
@@ -24,7 +24,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     linkLabel: 'Visit Surge',
     year: '2026',
     accent: 'surge',
-    beats: ['Review.', 'Test.', 'Improve.'],
+    beats: ['Test.', 'Review.', 'Post.'],
   },
   {
     index: '02',
