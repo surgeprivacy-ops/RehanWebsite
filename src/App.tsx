@@ -9,6 +9,7 @@ import SideRail from './components/ui/SideRail'
 import ScrollHint from './components/ui/ScrollHint'
 import Preloader from './components/ui/Preloader'
 import ProjectStory from './components/ui/ProjectStory'
+import SectionFrame from './components/ui/SectionFrame'
 import ColorDirector from './components/ColorDirector'
 import BackgroundCanvas from './components/canvas/BackgroundCanvas'
 
@@ -180,6 +181,7 @@ export default function App() {
       <div className="canvas-layer">
         <BackgroundCanvas />
       </div>
+      <SectionFrame />
       <div className="content-layer">
         <Nav />
         <Hero />

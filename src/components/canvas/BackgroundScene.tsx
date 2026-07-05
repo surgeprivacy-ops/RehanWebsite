@@ -98,24 +98,16 @@ function chooseQuietWorldY() {
   return screenYToWorld(best.y)
 }
 
-class KnotPath extends Curve<Vector3> {
+/** A plain circle — the traveling shape, simplified down from a torus knot. */
+class CirclePath extends Curve<Vector3> {
   constructor() {
     super()
   }
 
   getPoint(t: number) {
-    const p = 2
-    const q = 3
-    const u = t * Math.PI * 2 * p
-    const quOverP = (q / p) * u
-    const radius = 1.18
-    const orbit = radius * (2 + Math.cos(quOverP)) * 0.5
-
-    return new Vector3(
-      orbit * Math.cos(u),
-      orbit * Math.sin(u),
-      radius * Math.sin(quOverP) * 0.5,
-    )
+    const radius = 1.3
+    const u = t * Math.PI * 2
+    return new Vector3(radius * Math.cos(u), radius * Math.sin(u), 0)
   }
 }
 
@@ -171,7 +163,7 @@ function Knot({ lite }: { lite: boolean }) {
   const surgeMix = useRef(0)
   const laffyMix = useRef(0)
   const gradientMap = useToonGradientMap()
-  const knotGeometry = useMemo(() => makeTube(new KnotPath(), lite), [lite])
+  const knotGeometry = useMemo(() => makeTube(new CirclePath(), lite), [lite])
   const lineGeometry = useMemo(() => makeTube(new LinePath(), lite), [lite])
 
   useFrame((state, delta) => {
