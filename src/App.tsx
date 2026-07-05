@@ -8,6 +8,7 @@ import ScrollProgress from './components/ui/ScrollProgress'
 import SideRail from './components/ui/SideRail'
 import ScrollHint from './components/ui/ScrollHint'
 import Preloader from './components/ui/Preloader'
+import ProjectStory from './components/ui/ProjectStory'
 import ColorDirector from './components/ColorDirector'
 import BackgroundCanvas from './components/canvas/BackgroundCanvas'
 
@@ -18,6 +19,7 @@ function Nav() {
         Rehan
       </a>
       <div className="flex min-w-0 items-center gap-3 text-sm text-muted sm:gap-8">
+        <a href="#about" className="hidden sm:inline-block transition-all duration-300 hover:scale-110 hover:text-paper">About</a>
         <a href="#work" className="hidden sm:inline-block transition-all duration-300 hover:scale-110 hover:text-paper">Work</a>
         <Magnetic strength={0.4} className="inline-block">
           <a
@@ -66,47 +68,58 @@ function Hero() {
   )
 }
 
+function About() {
+  return (
+    <section
+      id="about"
+      data-act="about"
+      data-act-progress="0.2"
+      className="reveal border-t border-line px-4 py-20 sm:px-6 md:px-12 md:py-32"
+    >
+      <p className="text-sm tracking-[0.2em] uppercase text-muted sm:tracking-[0.25em]">About</p>
+      <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight tracking-tight sm:text-5xl md:text-6xl">
+        I design, build, and ship products <span className="italic text-amber">solo</span> — front end, back end, and everything in between.
+      </h2>
+      <p className="mt-8 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+        I&rsquo;m an engineer who cares more about what survives contact with real users than what looks good in a demo. Surge and Laffy were both taken from a blank page to production by me — product decisions, infrastructure, and the unglamorous parts in between. I&rsquo;m happiest shipping something small, watching how it&rsquo;s actually used, and iterating from there.
+      </p>
+    </section>
+  )
+}
+
 function Work() {
   return (
     <section id="work" data-act="work" data-act-progress="0.45" className="border-t border-line">
       {CASE_STUDIES.map((p) => (
-        <article
-          key={p.name}
-          className={`work-card accent-${p.accent} reveal grid gap-8 border-b border-line px-4 py-16 sm:px-6 sm:py-20 md:grid-cols-12 md:gap-10 md:px-12 md:py-32`}
-        >
-          <div className="md:col-span-2 text-sm text-muted tracking-[0.2em]">
-            {p.index} / {p.year}
-          </div>
-          <div className="md:col-span-6">
-            <h2 className="font-serif text-5xl tracking-tight sm:text-6xl md:text-7xl">{p.name}</h2>
-            <p className="mt-3 font-serif text-2xl italic text-amber">{p.tagline}</p>
-            <p className="mt-6 max-w-prose text-base leading-relaxed text-muted sm:mt-8 sm:text-lg">{p.description}</p>
-          </div>
-          <div className="md:col-span-4 flex flex-col justify-between gap-10">
-            <ul className="flex flex-wrap gap-2">
-              {p.stack.map((s) => (
-                <li
-                  key={s}
-                  className="text-xs tracking-wide text-muted border border-line px-3 py-1.5"
+        <div key={p.name}>
+          <ProjectStory project={p} />
+          <article
+            className={`work-card accent-${p.accent} reveal grid gap-8 border-b border-line px-4 py-16 sm:px-6 sm:py-20 md:grid-cols-12 md:gap-10 md:px-12 md:py-32`}
+          >
+            <div className="md:col-span-2 text-sm text-muted tracking-[0.2em]">
+              {p.index} / {p.year}
+            </div>
+            <div className="md:col-span-6">
+              <h2 className="font-serif text-5xl tracking-tight sm:text-6xl md:text-7xl">{p.name}</h2>
+              <p className="mt-3 font-serif text-2xl italic text-amber">{p.tagline}</p>
+              <p className="mt-6 max-w-prose text-base leading-relaxed text-muted sm:mt-8 sm:text-lg">{p.description}</p>
+            </div>
+            <div className="md:col-span-4 flex flex-col justify-end gap-10">
+              <Magnetic strength={0.3} className="self-start">
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-cursor-label="Visit"
+                  className="group inline-flex items-center gap-2 border border-paper/30 px-6 py-3 text-sm transition-colors hover:bg-paper hover:text-ink"
                 >
-                  {s}
-                </li>
-              ))}
-            </ul>
-            <Magnetic strength={0.3} className="self-start">
-              <a
-                href={p.url}
-                target="_blank"
-                rel="noreferrer"
-                data-cursor-label="Visit"
-                className="group inline-flex items-center gap-2 border border-paper/30 px-6 py-3 text-sm transition-colors hover:bg-paper hover:text-ink"
-              >
-                {p.linkLabel}
-                <ArrowUpRight size={16} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              </a>
-            </Magnetic>
-          </div>
-        </article>
+                  {p.linkLabel}
+                  <ArrowUpRight size={16} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </a>
+              </Magnetic>
+            </div>
+          </article>
+        </div>
       ))}
     </section>
   )
@@ -170,6 +183,7 @@ export default function App() {
       <div className="content-layer">
         <Nav />
         <Hero />
+        <About />
         <Work />
         <Footer />
       </div>

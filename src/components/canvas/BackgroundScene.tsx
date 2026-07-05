@@ -149,6 +149,7 @@ function useToonGradientMap() {
 
 const scratchSolid = new Color()
 const scratchOutline = new Color()
+const scratchProjectAccent = new Color()
 
 /**
  * The knot and the line are two separate, static meshes (normals computed
@@ -167,6 +168,8 @@ function Knot({ lite }: { lite: boolean }) {
   const morph = useRef(0)
   const quietWorldY = useRef(-0.8)
   const quietSample = useRef(0)
+  const surgeMix = useRef(0)
+  const laffyMix = useRef(0)
   const gradientMap = useToonGradientMap()
   const knotGeometry = useMemo(() => makeTube(new KnotPath(), lite), [lite])
   const lineGeometry = useMemo(() => makeTube(new LinePath(), lite), [lite])
@@ -201,20 +204,35 @@ function Knot({ lite }: { lite: boolean }) {
 
     morph.current += (k.m - morph.current) * 0.045
 
+    // Each project's pinned story gives the knot a distinct temperament:
+    // Surge (analytical, review/test) spins faster and cooler; Laffy
+    // (personalized, unbox) settles and warms toward its rose accent.
+    surgeMix.current += ((scrollState.activeProject === 'surge' ? 1 : 0) - surgeMix.current) * 0.05
+    laffyMix.current += ((scrollState.activeProject === 'laffy' ? 1 : 0) - laffyMix.current) * 0.05
+    const spinRate = 1 + surgeMix.current * 0.9 - laffyMix.current * 0.5
+
     if (spin.current) {
       const knotness = 1 - morph.current
-      spin.current.rotation.z += delta * knotness * (0.15 + scrollP * 0.5)
+      spin.current.rotation.z += delta * knotness * (0.15 + scrollP * 0.5) * spinRate
       spin.current.rotation.x += (0 - spin.current.rotation.x) * morph.current * 0.03
       spin.current.rotation.y += (0 - spin.current.rotation.y) * morph.current * 0.03
       spin.current.rotation.z += (LINE_TILT - spin.current.rotation.z) * lineAmount * 0.04
     }
 
-    const { paperRgb, accentRgb, inkRgb, dev } = scrollState.palette
+    const { paperRgb, accentRgb, surgeRgb, laffyRgb, inkRgb, dev } = scrollState.palette
     scratchSolid.setRGB(
       paperRgb[0] + (accentRgb[0] - paperRgb[0]) * dev * 0.65,
       paperRgb[1] + (accentRgb[1] - paperRgb[1]) * dev * 0.65,
       paperRgb[2] + (accentRgb[2] - paperRgb[2]) * dev * 0.65,
     )
+    if (surgeMix.current > 0.01) {
+      scratchProjectAccent.setRGB(surgeRgb[0], surgeRgb[1], surgeRgb[2])
+      scratchSolid.lerp(scratchProjectAccent, surgeMix.current * 0.85)
+    }
+    if (laffyMix.current > 0.01) {
+      scratchProjectAccent.setRGB(laffyRgb[0], laffyRgb[1], laffyRgb[2])
+      scratchSolid.lerp(scratchProjectAccent, laffyMix.current * 0.85)
+    }
     scratchOutline.setRGB(inkRgb[0], inkRgb[1], inkRgb[2])
 
     const knotOpacityTarget = k.o * (1 - lineAmount)
@@ -403,23 +421,25 @@ function DebrisCorridor() {
 
 const BLOOM_COUNT = 400
 
+function createBloomGeometry(count: number) {
+  const g = new BufferGeometry()
+  const positions = new Float32Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    const radius = 1.4 + Math.random() * 1.6
+    const theta = Math.random() * Math.PI * 2
+    const phi = Math.acos(Math.random() * 2 - 1)
+    positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
+    positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta) * 0.6
+    positions[i * 3 + 2] = radius * Math.cos(phi) * 0.6
+  }
+  g.setAttribute('position', new Float32BufferAttribute(positions, 3))
+  return g
+}
+
 /** One-shot rose particle bloom that windows in only near the finale. */
 function FinaleBloom() {
   const points = useRef<Points>(null)
-  const geometry = useMemo(() => {
-    const g = new BufferGeometry()
-    const positions = new Float32Array(BLOOM_COUNT * 3)
-    for (let i = 0; i < BLOOM_COUNT; i++) {
-      const radius = 1.4 + Math.random() * 1.6
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(Math.random() * 2 - 1)
-      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
-      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta) * 0.6
-      positions[i * 3 + 2] = radius * Math.cos(phi) * 0.6
-    }
-    g.setAttribute('position', new Float32BufferAttribute(positions, 3))
-    return g
-  }, [])
+  const geometry = useMemo(() => createBloomGeometry(BLOOM_COUNT), [])
 
   useFrame(() => {
     const max = document.documentElement.scrollHeight - window.innerHeight
@@ -447,6 +467,39 @@ function FinaleBloom() {
   )
 }
 
+const LAFFY_BLOOM_COUNT = 220
+
+/** Soft particle bloom that swells in behind the knot while Laffy's story beats are pinned. */
+function LaffyBloom() {
+  const points = useRef<Points>(null)
+  const geometry = useMemo(() => createBloomGeometry(LAFFY_BLOOM_COUNT), [])
+
+  useFrame(() => {
+    const max = document.documentElement.scrollHeight - window.innerHeight
+    const p = max > 0 ? clamp01(window.scrollY / max) : 0
+    const k = sample(p)
+    if (points.current) {
+      points.current.position.set(k.x, k.y, 0)
+      points.current.rotation.y += 0.001
+    }
+    const active = scrollState.activeProject === 'laffy'
+    const wobble = Math.sin(scrollState.projectProgress * Math.PI)
+    const targetOpacity = active ? clamp01(wobble) * 0.6 : 0
+    const mat = points.current?.material as PointsMaterial | undefined
+    if (mat) {
+      mat.opacity += (targetOpacity - mat.opacity) * 0.08
+      const { laffyRgb } = scrollState.palette
+      mat.color.setRGB(laffyRgb[0], laffyRgb[1], laffyRgb[2])
+    }
+  })
+
+  return (
+    <points ref={points} geometry={geometry}>
+      <pointsMaterial size={0.03} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
+    </points>
+  )
+}
+
 function Lights() {
   return (
     <>
@@ -470,6 +523,7 @@ export default function BackgroundScene({ lite = false }: { lite?: boolean }) {
       <Knot lite={lite} />
       {!lite && <Companion />}
       {!lite && <DebrisCorridor />}
+      <LaffyBloom />
       <FinaleBloom />
     </Canvas>
   )

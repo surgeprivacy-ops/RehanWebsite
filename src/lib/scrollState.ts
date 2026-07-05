@@ -12,6 +12,10 @@ export const scrollState = {
   isFlooded: false,
   palette: samplePalette(0),
   hoverAccent: null as [number, number, number] | null,
+  /** Which project's pinned story section is currently scrubbing, if any. */
+  activeProject: 'none' as 'none' | 'surge' | 'laffy',
+  /** 0-1 local progress through the active project's pinned section. */
+  projectProgress: 0,
 }
 
 export function updateScrollState(rawProgress: number, damping = 0.07) {

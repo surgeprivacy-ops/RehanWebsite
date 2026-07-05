@@ -8,6 +8,8 @@ export interface CaseStudy {
   linkLabel: string
   year: string
   accent: 'surge' | 'laffy'
+  /** The story beats scrubbed through while this project's intro is pinned. */
+  beats: string[]
 }
 
 export const CASE_STUDIES: CaseStudy[] = [
@@ -22,6 +24,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     linkLabel: 'Visit Surge',
     year: '2026',
     accent: 'surge',
+    beats: ['Review.', 'Test.', 'Improve.'],
   },
   {
     index: '02',
@@ -34,5 +37,6 @@ export const CASE_STUDIES: CaseStudy[] = [
     linkLabel: 'Visit Laffy',
     year: '2026',
     accent: 'laffy',
+    beats: ['Scan.', 'Personalize.', 'Unbox.'],
   },
 ]
