@@ -41,7 +41,7 @@ const CAMERA_FOV = 45
  */
 type Waypoint = { at: number; x: number; y: number; s: number; o: number; m: number }
 const WAYPOINTS: Waypoint[] = [
-  { at: 0.0, x: 2.55, y: 0.0, s: 1.28, o: 0.95, m: 0 }, // hero: full circle, right side, front and center
+  { at: 0.0, x: 2.55, y: 0.0, s: 1.94, o: 0.95, m: 0 }, // hero: full circle, right side, front and center (scale bumped to compensate for COIL_LENGTH's smaller resting radius)
   { at: 0.1, x: 1.9, y: -0.4, s: 1.05, o: 0.85, m: 0.3 }, // begins unraveling into the line
   { at: 0.22, x: 1.3, y: -0.9, s: 0.85, o: 0.78, m: 1 }, // work: fully a line now, still clearly visible
   { at: 0.55, x: 1.45, y: -0.9, s: 0.8, o: 0.75, m: 1 }, // drifts through whitespace, staying present
@@ -98,19 +98,27 @@ function chooseQuietWorldY() {
   return screenYToWorld(best.y)
 }
 
-const CIRCLE_RADIUS = 1.3
-/** Circumference of the m=0 circle — kept as the line's length too, so the
- *  tube's own arc length never stretches or compresses as it opens up. */
-const COIL_LENGTH = CIRCLE_RADIUS * Math.PI * 2
+/**
+ * Deliberately NOT the true circumference of the resting circle (that would
+ * be ~8.17 for a radius-1.3 circle). Preserving exact arc length forces the
+ * radius to grow without bound as the angular span shrinks toward a line —
+ * by the later keyframes it had ballooned to ~3x its resting size and filled
+ * most of the viewport, reading as "a huge ring" rather than a shape
+ * unraveling. Keeping this modest caps how large the radius ever gets
+ * (~2x resting size at most), at the cost of the coil "compressing" a
+ * little as it opens — a small, invisible cheat for a much more contained
+ * shape. The resting circle's radius (m=0) comes out to COIL_LENGTH/2π≈0.86;
+ * the hero waypoint's scale is bumped up to compensate (see WAYPOINTS).
+ */
+const COIL_LENGTH = 5.4
 
 /**
- * A point on the "opening coil" family: at m=0 this traces an exact circle of
- * radius CIRCLE_RADIUS; at m=1 it's an exact straight line of length
- * COIL_LENGTH; in between it's a circular arc of constant arc length that
- * widens its angular span down to 0 as m rises — literally the shape you'd
- * get by holding a loop of wire and progressively straightening it, not a
- * per-vertex lerp between two unrelated shapes (which looks like the ends
- * sliding through each other rather than uncurling).
+ * A point on the "opening coil" family: at m=0 this traces a circle; at m=1
+ * it's an exact straight line of length COIL_LENGTH; in between it's a
+ * circular arc that widens its angular span down to 0 as m rises — the
+ * shape you'd get by holding a loop of wire and progressively straightening
+ * it, not a per-vertex lerp between two unrelated shapes (which looks like
+ * the ends sliding through each other rather than uncurling).
  */
 function unrollPoint(t: number, m: number, out: Vector3) {
   const totalAngle = (1 - m) * Math.PI * 2
