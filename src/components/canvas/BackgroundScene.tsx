@@ -154,15 +154,21 @@ function makeTube(path: Curve<Vector3>, lite: boolean) {
   return lite ? new TubeGeometry(path, 120, 0.16, 12, true) : new TubeGeometry(path, 240, 0.16, 24, true)
 }
 
-const MORPH_STOPS = [1 / 3, 2 / 3, 1]
+// Spaced by radius *ratio*, not by m: the radius diverges as m -> 1, so
+// evenly-spaced m values put keyframes farther and farther apart in actual
+// shape terms near the end (the opposite of what's needed). These stops
+// keep each keyframe's radius about 1.28x the last, all the way up, so the
+// straight-line-between-keyframes blend never has to bridge a big enough
+// shape difference to visibly cut a "connecting" chord across the arc.
+const MORPH_STOPS = [0.221, 0.393, 0.527, 0.632, 0.7135, 1]
 
 /**
- * The base geometry is the m=0 circle; the three morph targets are keyframes
- * along the opening-coil curve at m=1/3, 2/3, 1. Blending two adjacent
+ * The base geometry is the m=0 circle; the morph targets are keyframes along
+ * the opening-coil curve at each MORPH_STOPS value. Blending two adjacent
  * keyframes (or base→first keyframe) via morphTargetInfluences each frame
- * gives a GPU-driven, per-vertex-correct approximation of the continuous
- * unroll — cheap (static precomputed buffers, no per-frame CPU geometry
- * work) while still looking like the coil is actually uncurling.
+ * gives a GPU-driven approximation of the continuous unroll — cheap (static
+ * precomputed buffers, no per-frame CPU geometry work) while still looking
+ * like the coil is actually uncurling rather than jumping between shapes.
  */
 function buildUnrollGeometry(lite: boolean) {
   const base = makeTube(new UnrollPath(0), lite)
@@ -324,7 +330,13 @@ function Knot({ lite }: { lite: boolean }) {
           <mesh ref={solid} geometry={geometry}>
             <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
           </mesh>
-          <mesh ref={outline} geometry={geometry} scale={1.025}>
+          {/* Uniform scale-up around the origin only gives a constant-width
+              rim for a compact, centered shape (the old torus knot). This
+              shape spreads out much farther from the origin as it opens,
+              so the same scale drifts the outline more at the far tips than
+              near the center — a smaller multiplier keeps that drift small
+              enough not to visibly detach from the solid mesh. */}
+          <mesh ref={outline} geometry={geometry} scale={1.008}>
             <meshBasicMaterial side={BackSide} transparent opacity={0} />
           </mesh>
         </group>
