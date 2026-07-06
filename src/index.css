@@ -203,6 +203,17 @@ body {
   50% { opacity: 1; transform: scaleY(1); }
 }
 
+/* proof section */
+.proof-label {
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0;
+  word-spacing: 0.08em;
+  text-wrap: balance;
+  text-shadow: 0 0 28px color-mix(in srgb, var(--color-ink) 82%, transparent);
+  transition: opacity 0.35s ease;
+}
+
 /* the z-sandwich: mega background type sits under the 3D canvas and content */
 .mega-type-layer {
   position: absolute;

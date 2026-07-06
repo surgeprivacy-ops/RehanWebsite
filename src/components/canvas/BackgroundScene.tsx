@@ -6,6 +6,7 @@ import {
   BackSide,
   BufferGeometry,
   Color,
+  ConeGeometry,
   Curve,
   DataTexture,
   Float32BufferAttribute,
@@ -13,12 +14,14 @@ import {
   NearestFilter,
   Object3D,
   RedFormat,
-  TubeGeometry,
+  SphereGeometry,
   Vector3,
 } from 'three'
 import type {
   Group,
   InstancedMesh,
+  LineBasicMaterial,
+  LineSegments,
   Mesh,
   MeshBasicMaterial,
   MeshToonMaterial,
@@ -26,7 +29,7 @@ import type {
   PointsMaterial,
 } from 'three'
 import { scrollState } from '../../lib/scrollState'
-import { CROSS_T, POWER_EXPONENT, X_DOMAIN } from '../../lib/growthChart'
+import { CROSS_T, EXP_BASE, POWER_EXPONENT, X_DOMAIN } from '../../lib/growthChart'
 
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1)
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
@@ -67,15 +70,20 @@ function sample(p: number): Omit<Waypoint, 'at'> {
 
 /**
  * The two curves of the proof section, literally: x^1.01 (compounds, starts
- * at 0) racing a flat 1^x (never moves, starts at 1). Both share the same
- * world-space span so t=0..1 walks real x=0..X_DOMAIN on either curve. A
- * small z undulation on the power curve gives its tube real depth so toon
- * shading reads it as a 3D object rather than a flat ribbon; the flat line
- * stays perfectly planar to read as "unchanging" beside it.
+ * at 0) racing 1.1^x (starts at 1, then compounds). Both share the same
+ * world-space span so t=0..1 walks real x=0..X_DOMAIN on either curve. The
+ * curves are intentionally spare: the graph should feel designed, not like a
+ * generated sculpture.
  */
-const CHART_SPAN_X = 4.6
-const CHART_Y_SCALE = 0.42
-const CHART_BASE_Y = -1.05
+const CHART_SPAN_X = 5.2
+const CHART_Y_SCALE = 0.32
+const CHART_BASE_Y = -1.18
+const CHART_LEFT = -CHART_SPAN_X / 2
+const CHART_RIGHT = CHART_SPAN_X / 2
+const CHART_TOP = CHART_BASE_Y + Math.pow(X_DOMAIN, POWER_EXPONENT) * CHART_Y_SCALE
+const CHART_AXIS_Z = -0.04
+const CHART_CURVE_Z = 0.02
+const CHART_FIT_WIDTH = CHART_SPAN_X + 0.9
 
 class PowerCurvePath extends Curve<Vector3> {
   constructor() {
@@ -87,18 +95,19 @@ class PowerCurvePath extends Curve<Vector3> {
     return optionalTarget.set(
       (t - 0.5) * CHART_SPAN_X,
       CHART_BASE_Y + CHART_Y_SCALE * real,
-      Math.sin(t * Math.PI * 2) * 0.14,
+      CHART_CURVE_Z,
     )
   }
 }
 
-class FlatCurvePath extends Curve<Vector3> {
+class ExponentialCurvePath extends Curve<Vector3> {
   constructor() {
     super()
   }
 
   getPoint(t: number, optionalTarget = new Vector3()) {
-    return optionalTarget.set((t - 0.5) * CHART_SPAN_X, CHART_BASE_Y + CHART_Y_SCALE, 0)
+    const real = Math.pow(EXP_BASE, t * X_DOMAIN)
+    return optionalTarget.set((t - 0.5) * CHART_SPAN_X, CHART_BASE_Y + CHART_Y_SCALE * real, CHART_CURVE_Z - 0.02)
   }
 }
 
@@ -120,125 +129,185 @@ const scratchSolid = new Color()
 const scratchOutline = new Color()
 
 const powerCurvePath = new PowerCurvePath()
-const flatCurvePath = new FlatCurvePath()
+const exponentialCurvePath = new ExponentialCurvePath()
 const scratchCrossPoint = new Vector3()
 
+function createChartAxesGeometry() {
+  const g = new BufferGeometry()
+  g.setAttribute(
+    'position',
+    new Float32BufferAttribute(
+      [
+        CHART_LEFT,
+        CHART_BASE_Y,
+        CHART_AXIS_Z,
+        CHART_RIGHT + 0.28,
+        CHART_BASE_Y,
+        CHART_AXIS_Z,
+        CHART_LEFT,
+        CHART_BASE_Y,
+        CHART_AXIS_Z,
+        CHART_LEFT,
+        CHART_TOP + 0.28,
+        CHART_AXIS_Z,
+      ],
+      3,
+    ),
+  )
+  return g
+}
+
+function createChartGridGeometry() {
+  const points: number[] = []
+  for (let i = 1; i <= X_DOMAIN; i++) {
+    const x = CHART_LEFT + (i / X_DOMAIN) * CHART_SPAN_X
+    points.push(x, CHART_BASE_Y, CHART_AXIS_Z, x, CHART_TOP, CHART_AXIS_Z)
+  }
+  for (let i = 1; i <= 6; i++) {
+    const y = CHART_BASE_Y + i * CHART_Y_SCALE
+    points.push(CHART_LEFT, y, CHART_AXIS_Z, CHART_RIGHT, y, CHART_AXIS_Z)
+  }
+
+  const g = new BufferGeometry()
+  g.setAttribute('position', new Float32BufferAttribute(points, 3))
+  return g
+}
+
+function createCurveLineSegmentsGeometry(path: Curve<Vector3>, segments: number) {
+  const points: number[] = []
+  const a = new Vector3()
+  const b = new Vector3()
+  for (let i = 0; i < segments; i++) {
+    path.getPoint(i / segments, a)
+    path.getPoint((i + 1) / segments, b)
+    points.push(a.x, a.y, a.z, b.x, b.y, b.z)
+  }
+
+  const g = new BufferGeometry()
+  g.setAttribute('position', new Float32BufferAttribute(points, 3))
+  g.setDrawRange(0, 0)
+  return g
+}
+
 /**
- * The proof section's two curves, drawing themselves as the visitor scrolls
- * through it — no morphing, no topology change, ever. Each tube geometry is
- * built once; each frame only drawRange moves, so both curves extend
- * together from local progress written by <GrowthProof>. A marker fades in
- * at (1, 1) — real x=1 — the instant the draw passes the point where x^1.01
- * overtakes the flat line for good.
+ * A scroll-scrubbed WebGL graph: thin axes, a quiet grid, and two spare
+ * curves. The geometry stays 3D, but the styling borrows from a clean math
+ * animation instead of a chunky object render.
  */
 function GrowthChart({ lite }: { lite: boolean }) {
   const rig = useRef<Group>(null)
-  const power = useRef<Mesh>(null)
-  const powerOutline = useRef<Mesh>(null)
-  const flat = useRef<Mesh>(null)
-  const flatOutline = useRef<Mesh>(null)
+  const grid = useRef<LineSegments>(null)
+  const axes = useRef<LineSegments>(null)
+  const arrowX = useRef<Mesh>(null)
+  const arrowY = useRef<Mesh>(null)
+  const power = useRef<LineSegments>(null)
+  const exponential = useRef<LineSegments>(null)
   const cross = useRef<Mesh>(null)
   const draw = useRef(0)
   const activeMix = useRef(0)
-  const gradientMap = useToonGradientMap()
-  const powerGeometry = useMemo(
-    () => (lite ? new TubeGeometry(powerCurvePath, 100, 0.14, 12, false) : new TubeGeometry(powerCurvePath, 200, 0.14, 20, false)),
-    [lite],
-  )
-  const flatGeometry = useMemo(
-    () => (lite ? new TubeGeometry(flatCurvePath, 100, 0.09, 12, false) : new TubeGeometry(flatCurvePath, 200, 0.09, 20, false)),
-    [lite],
-  )
-  const crossGeometry = useMemo(() => new IcosahedronGeometry(0.16, 0), [])
-  const powerIndexCount = powerGeometry.index ? powerGeometry.index.count : 0
-  const flatIndexCount = flatGeometry.index ? flatGeometry.index.count : 0
+  const axesGeometry = useMemo(createChartAxesGeometry, [])
+  const gridGeometry = useMemo(createChartGridGeometry, [])
+  const powerGeometry = useMemo(() => createCurveLineSegmentsGeometry(powerCurvePath, lite ? 120 : 240), [lite])
+  const exponentialGeometry = useMemo(() => createCurveLineSegmentsGeometry(exponentialCurvePath, lite ? 120 : 240), [lite])
+  const arrowGeometry = useMemo(() => new ConeGeometry(0.055, 0.18, 16), [])
+  const crossGeometry = useMemo(() => new SphereGeometry(0.04, 16, 10), [])
+  const powerPointCount = powerGeometry.getAttribute('position').count
+  const exponentialPointCount = exponentialGeometry.getAttribute('position').count
 
   useFrame((state) => {
     const target = scrollState.proofActive ? 1 : 0
     activeMix.current += (target - activeMix.current) * 0.06
     draw.current += (scrollState.proofProgress - draw.current) * 0.08
 
-    const visiblePower = Math.min(powerIndexCount, Math.floor((powerIndexCount * draw.current) / 3) * 3)
+    const visiblePower = Math.min(powerPointCount, Math.floor((powerPointCount * draw.current) / 2) * 2)
     powerGeometry.setDrawRange(0, visiblePower)
-    const visibleFlat = Math.min(flatIndexCount, Math.floor((flatIndexCount * draw.current) / 3) * 3)
-    flatGeometry.setDrawRange(0, visibleFlat)
+    const visibleExponential = Math.min(exponentialPointCount, Math.floor((exponentialPointCount * draw.current) / 2) * 2)
+    exponentialGeometry.setDrawRange(0, visibleExponential)
 
     if (rig.current) {
-      // Gentle parallax only — the power tube has real z-depth from its
-      // undulation, so a small tilt adds dimension without foreshortening it.
-      const targetRotY = state.pointer.x * 0.12
-      const targetRotX = state.pointer.y * -0.08
+      const targetRotY = state.pointer.x * 0.045
+      const targetRotX = state.pointer.y * -0.03
       rig.current.rotation.y += (targetRotY - rig.current.rotation.y) * 0.05
       rig.current.rotation.x += (targetRotX - rig.current.rotation.x) * 0.05
+      const targetScale = Math.min(1, (state.viewport.width * 0.88) / CHART_FIT_WIDTH)
+      const scale = rig.current.scale.x + (targetScale - rig.current.scale.x) * 0.08
+      rig.current.scale.setScalar(scale)
     }
 
-    // The crossover marker sits at (1, 1) in real terms and fades in once
-    // the draw has actually passed it, never before.
     if (cross.current) {
       powerCurvePath.getPoint(CROSS_T, scratchCrossPoint)
       cross.current.position.copy(scratchCrossPoint)
-      cross.current.rotation.y += 0.012
-      cross.current.rotation.z += 0.005
     }
 
-    const { paperRgb, accentRgb, inkRgb, dev } = scrollState.palette
-    const baseOpacity = activeMix.current * 0.95
+    const { paperRgb, accentRgb, inkRgb } = scrollState.palette
+    const baseOpacity = activeMix.current * 0.88
 
-    // The power curve is the story's protagonist — it takes the accent color.
-    scratchSolid.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
+    scratchSolid.setRGB(paperRgb[0], paperRgb[1], paperRgb[2])
     scratchOutline.setRGB(inkRgb[0], inkRgb[1], inkRgb[2])
-    const powerMat = power.current?.material as MeshToonMaterial | undefined
+
+    const gridMat = grid.current?.material as LineBasicMaterial | undefined
+    if (gridMat) {
+      gridMat.opacity += (baseOpacity * 0.16 - gridMat.opacity) * 0.08
+      gridMat.color.copy(scratchSolid)
+    }
+
+    const axesMat = axes.current?.material as LineBasicMaterial | undefined
+    if (axesMat) {
+      axesMat.opacity += (baseOpacity * 0.55 - axesMat.opacity) * 0.08
+      axesMat.color.copy(scratchSolid)
+    }
+
+    for (const arrow of [arrowX.current, arrowY.current]) {
+      const mat = arrow?.material as MeshBasicMaterial | undefined
+      if (mat) {
+        mat.opacity += (baseOpacity * 0.72 - mat.opacity) * 0.08
+        mat.color.copy(scratchSolid)
+      }
+    }
+
+    const powerMat = power.current?.material as LineBasicMaterial | undefined
     if (powerMat) {
       powerMat.opacity += (baseOpacity - powerMat.opacity) * 0.08
-      powerMat.color.copy(scratchSolid)
-      powerMat.emissive.copy(scratchSolid).multiplyScalar(0.2 + dev * 0.15)
-    }
-    const powerOutlineMat = powerOutline.current?.material as MeshBasicMaterial | undefined
-    if (powerOutlineMat && powerMat) {
-      powerOutlineMat.opacity = powerMat.opacity * 0.85
-      powerOutlineMat.color.copy(scratchOutline)
+      powerMat.color.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
     }
 
-    // The flat line stays muted — it never changes, so it never draws the eye.
-    scratchSolid.setRGB(paperRgb[0], paperRgb[1], paperRgb[2])
-    const flatMat = flat.current?.material as MeshToonMaterial | undefined
-    if (flatMat) {
-      flatMat.opacity += (baseOpacity * 0.75 - flatMat.opacity) * 0.08
-      flatMat.color.copy(scratchSolid)
-      flatMat.emissive.copy(scratchSolid).multiplyScalar(0.08)
-    }
-    const flatOutlineMat = flatOutline.current?.material as MeshBasicMaterial | undefined
-    if (flatOutlineMat && flatMat) {
-      flatOutlineMat.opacity = flatMat.opacity * 0.85
-      flatOutlineMat.color.copy(scratchOutline)
+    const exponentialMat = exponential.current?.material as LineBasicMaterial | undefined
+    if (exponentialMat) {
+      exponentialMat.opacity += (baseOpacity * 0.68 - exponentialMat.opacity) * 0.08
+      exponentialMat.color.copy(scratchSolid)
     }
 
-    const crossTarget = draw.current >= CROSS_T ? baseOpacity : 0
-    const crossMat = cross.current?.material as MeshToonMaterial | undefined
+    const crossTarget = draw.current >= CROSS_T ? baseOpacity * 0.45 : 0
+    const crossMat = cross.current?.material as MeshBasicMaterial | undefined
     if (crossMat) {
       crossMat.opacity += (crossTarget - crossMat.opacity) * 0.1
       crossMat.color.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
-      crossMat.emissive.setRGB(accentRgb[0], accentRgb[1], accentRgb[2]).multiplyScalar(0.4)
     }
   })
 
   return (
-    <group ref={rig} position={[1.15, -0.15, 0]}>
-      <Float speed={1.1} rotationIntensity={0.12} floatIntensity={0.5}>
-        <mesh ref={power} geometry={powerGeometry}>
-          <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
+    <group ref={rig} position={[0, -0.05, 0]}>
+      <Float speed={0.55} rotationIntensity={0.035} floatIntensity={0.12}>
+        <lineSegments ref={grid} geometry={gridGeometry}>
+          <lineBasicMaterial transparent opacity={0} depthWrite={false} />
+        </lineSegments>
+        <lineSegments ref={axes} geometry={axesGeometry}>
+          <lineBasicMaterial transparent opacity={0} depthWrite={false} />
+        </lineSegments>
+        <mesh ref={arrowX} geometry={arrowGeometry} position={[CHART_RIGHT + 0.32, CHART_BASE_Y, CHART_AXIS_Z]} rotation={[0, 0, -Math.PI / 2]}>
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
-        <mesh ref={powerOutline} geometry={powerGeometry} scale={1.01}>
-          <meshBasicMaterial side={BackSide} transparent opacity={0} />
+        <mesh ref={arrowY} geometry={arrowGeometry} position={[CHART_LEFT, CHART_TOP + 0.32, CHART_AXIS_Z]}>
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
-        <mesh ref={flat} geometry={flatGeometry}>
-          <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
-        </mesh>
-        <mesh ref={flatOutline} geometry={flatGeometry} scale={1.01}>
-          <meshBasicMaterial side={BackSide} transparent opacity={0} />
-        </mesh>
+        <lineSegments ref={exponential} geometry={exponentialGeometry}>
+          <lineBasicMaterial transparent opacity={0} depthWrite={false} />
+        </lineSegments>
+        <lineSegments ref={power} geometry={powerGeometry}>
+          <lineBasicMaterial transparent opacity={0} depthWrite={false} />
+        </lineSegments>
         <mesh ref={cross} geometry={crossGeometry}>
-          <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
       </Float>
     </group>
@@ -296,7 +365,8 @@ function DebrisCorridor() {
     outlineMesh.instanceMatrix.needsUpdate = true
 
     const { paperRgb, accentRgb, inkRgb, dev } = scrollState.palette
-    const opacity = clamp01(0.16 + Math.sin(p * Math.PI) * 0.12)
+    const proofQuiet = scrollState.proofActive ? 0.16 : 1
+    const opacity = clamp01(0.16 + Math.sin(p * Math.PI) * 0.12) * proofQuiet
     const solidMat = solidMesh.material as MeshToonMaterial
     solidMat.opacity += (opacity - solidMat.opacity) * 0.07
     scratchSolid.setRGB(
