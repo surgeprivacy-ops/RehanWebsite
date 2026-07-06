@@ -78,6 +78,10 @@ const CHART_Y_SCALE = 0.42
 const CHART_BASE_Y = -1.05
 
 class PowerCurvePath extends Curve<Vector3> {
+  constructor() {
+    super()
+  }
+
   getPoint(t: number, optionalTarget = new Vector3()) {
     const real = Math.pow(t * X_DOMAIN, POWER_EXPONENT)
     return optionalTarget.set(
@@ -89,6 +93,10 @@ class PowerCurvePath extends Curve<Vector3> {
 }
 
 class FlatCurvePath extends Curve<Vector3> {
+  constructor() {
+    super()
+  }
+
   getPoint(t: number, optionalTarget = new Vector3()) {
     return optionalTarget.set((t - 0.5) * CHART_SPAN_X, CHART_BASE_Y + CHART_Y_SCALE, 0)
   }
