@@ -38,7 +38,7 @@ export default function GrowthProof() {
     <section
       id="proof"
       data-act="proof"
-      data-act-progress="0.1"
+      data-act-progress="0.84"
       ref={wrapRef}
       className="relative border-t border-line"
       style={{ height: '220vh' }}

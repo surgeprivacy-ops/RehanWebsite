@@ -29,7 +29,7 @@ import type {
   PointsMaterial,
 } from 'three'
 import { scrollState } from '../../lib/scrollState'
-import { CROSS_T, EXP_BASE, POWER_EXPONENT, X_DOMAIN } from '../../lib/growthChart'
+import { CROSS_T, X_DOMAIN, fastExponential, slowExponential } from '../../lib/growthChart'
 
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1)
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
@@ -69,29 +69,28 @@ function sample(p: number): Omit<Waypoint, 'at'> {
 }
 
 /**
- * The two curves of the proof section, literally: x^1.01 (compounds, starts
- * at 0) racing 1.1^x (starts at 1, then compounds). Both share the same
- * world-space span so t=0..1 walks real x=0..X_DOMAIN on either curve. The
- * curves are intentionally spare: the graph should feel designed, not like a
- * generated sculpture.
+ * The proof section uses two true exponentials: one starts lower but compounds
+ * faster, the other starts higher and compounds slowly. Same domain, same
+ * world-space span; the crossing point is shared with the DOM label timing.
  */
 const CHART_SPAN_X = 5.2
 const CHART_Y_SCALE = 0.32
 const CHART_BASE_Y = -1.18
 const CHART_LEFT = -CHART_SPAN_X / 2
 const CHART_RIGHT = CHART_SPAN_X / 2
-const CHART_TOP = CHART_BASE_Y + Math.pow(X_DOMAIN, POWER_EXPONENT) * CHART_Y_SCALE
+const CHART_VALUE_MAX = Math.ceil(Math.max(fastExponential(X_DOMAIN), slowExponential(X_DOMAIN)))
+const CHART_TOP = CHART_BASE_Y + CHART_VALUE_MAX * CHART_Y_SCALE
 const CHART_AXIS_Z = -0.04
 const CHART_CURVE_Z = 0.02
 const CHART_FIT_WIDTH = CHART_SPAN_X + 0.9
 
-class PowerCurvePath extends Curve<Vector3> {
+class FastExponentialCurvePath extends Curve<Vector3> {
   constructor() {
     super()
   }
 
   getPoint(t: number, optionalTarget = new Vector3()) {
-    const real = Math.pow(t * X_DOMAIN, POWER_EXPONENT)
+    const real = fastExponential(t * X_DOMAIN)
     return optionalTarget.set(
       (t - 0.5) * CHART_SPAN_X,
       CHART_BASE_Y + CHART_Y_SCALE * real,
@@ -100,13 +99,13 @@ class PowerCurvePath extends Curve<Vector3> {
   }
 }
 
-class ExponentialCurvePath extends Curve<Vector3> {
+class SlowExponentialCurvePath extends Curve<Vector3> {
   constructor() {
     super()
   }
 
   getPoint(t: number, optionalTarget = new Vector3()) {
-    const real = Math.pow(EXP_BASE, t * X_DOMAIN)
+    const real = slowExponential(t * X_DOMAIN)
     return optionalTarget.set((t - 0.5) * CHART_SPAN_X, CHART_BASE_Y + CHART_Y_SCALE * real, CHART_CURVE_Z - 0.02)
   }
 }
@@ -128,8 +127,8 @@ function useToonGradientMap() {
 const scratchSolid = new Color()
 const scratchOutline = new Color()
 
-const powerCurvePath = new PowerCurvePath()
-const exponentialCurvePath = new ExponentialCurvePath()
+const fastExponentialCurvePath = new FastExponentialCurvePath()
+const slowExponentialCurvePath = new SlowExponentialCurvePath()
 const scratchCrossPoint = new Vector3()
 
 function createChartAxesGeometry() {
@@ -163,7 +162,7 @@ function createChartGridGeometry() {
     const x = CHART_LEFT + (i / X_DOMAIN) * CHART_SPAN_X
     points.push(x, CHART_BASE_Y, CHART_AXIS_Z, x, CHART_TOP, CHART_AXIS_Z)
   }
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= CHART_VALUE_MAX; i++) {
     const y = CHART_BASE_Y + i * CHART_Y_SCALE
     points.push(CHART_LEFT, y, CHART_AXIS_Z, CHART_RIGHT, y, CHART_AXIS_Z)
   }
@@ -200,29 +199,29 @@ function GrowthChart({ lite }: { lite: boolean }) {
   const axes = useRef<LineSegments>(null)
   const arrowX = useRef<Mesh>(null)
   const arrowY = useRef<Mesh>(null)
-  const power = useRef<LineSegments>(null)
-  const exponential = useRef<LineSegments>(null)
+  const fast = useRef<LineSegments>(null)
+  const slow = useRef<LineSegments>(null)
   const cross = useRef<Mesh>(null)
   const draw = useRef(0)
   const activeMix = useRef(0)
   const axesGeometry = useMemo(createChartAxesGeometry, [])
   const gridGeometry = useMemo(createChartGridGeometry, [])
-  const powerGeometry = useMemo(() => createCurveLineSegmentsGeometry(powerCurvePath, lite ? 120 : 240), [lite])
-  const exponentialGeometry = useMemo(() => createCurveLineSegmentsGeometry(exponentialCurvePath, lite ? 120 : 240), [lite])
+  const fastGeometry = useMemo(() => createCurveLineSegmentsGeometry(fastExponentialCurvePath, lite ? 120 : 240), [lite])
+  const slowGeometry = useMemo(() => createCurveLineSegmentsGeometry(slowExponentialCurvePath, lite ? 120 : 240), [lite])
   const arrowGeometry = useMemo(() => new ConeGeometry(0.055, 0.18, 16), [])
   const crossGeometry = useMemo(() => new SphereGeometry(0.04, 16, 10), [])
-  const powerPointCount = powerGeometry.getAttribute('position').count
-  const exponentialPointCount = exponentialGeometry.getAttribute('position').count
+  const fastPointCount = fastGeometry.getAttribute('position').count
+  const slowPointCount = slowGeometry.getAttribute('position').count
 
   useFrame((state) => {
     const target = scrollState.proofActive ? 1 : 0
     activeMix.current += (target - activeMix.current) * 0.06
     draw.current += (scrollState.proofProgress - draw.current) * 0.08
 
-    const visiblePower = Math.min(powerPointCount, Math.floor((powerPointCount * draw.current) / 2) * 2)
-    powerGeometry.setDrawRange(0, visiblePower)
-    const visibleExponential = Math.min(exponentialPointCount, Math.floor((exponentialPointCount * draw.current) / 2) * 2)
-    exponentialGeometry.setDrawRange(0, visibleExponential)
+    const visibleFast = Math.min(fastPointCount, Math.floor((fastPointCount * draw.current) / 2) * 2)
+    fastGeometry.setDrawRange(0, visibleFast)
+    const visibleSlow = Math.min(slowPointCount, Math.floor((slowPointCount * draw.current) / 2) * 2)
+    slowGeometry.setDrawRange(0, visibleSlow)
 
     if (rig.current) {
       const targetRotY = state.pointer.x * 0.045
@@ -235,7 +234,7 @@ function GrowthChart({ lite }: { lite: boolean }) {
     }
 
     if (cross.current) {
-      powerCurvePath.getPoint(CROSS_T, scratchCrossPoint)
+      fastExponentialCurvePath.getPoint(CROSS_T, scratchCrossPoint)
       cross.current.position.copy(scratchCrossPoint)
     }
 
@@ -265,16 +264,16 @@ function GrowthChart({ lite }: { lite: boolean }) {
       }
     }
 
-    const powerMat = power.current?.material as LineBasicMaterial | undefined
-    if (powerMat) {
-      powerMat.opacity += (baseOpacity - powerMat.opacity) * 0.08
-      powerMat.color.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
+    const fastMat = fast.current?.material as LineBasicMaterial | undefined
+    if (fastMat) {
+      fastMat.opacity += (baseOpacity - fastMat.opacity) * 0.08
+      fastMat.color.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
     }
 
-    const exponentialMat = exponential.current?.material as LineBasicMaterial | undefined
-    if (exponentialMat) {
-      exponentialMat.opacity += (baseOpacity * 0.68 - exponentialMat.opacity) * 0.08
-      exponentialMat.color.copy(scratchSolid)
+    const slowMat = slow.current?.material as LineBasicMaterial | undefined
+    if (slowMat) {
+      slowMat.opacity += (baseOpacity * 0.68 - slowMat.opacity) * 0.08
+      slowMat.color.copy(scratchSolid)
     }
 
     const crossTarget = draw.current >= CROSS_T ? baseOpacity * 0.45 : 0
@@ -300,10 +299,10 @@ function GrowthChart({ lite }: { lite: boolean }) {
         <mesh ref={arrowY} geometry={arrowGeometry} position={[CHART_LEFT, CHART_TOP + 0.32, CHART_AXIS_Z]}>
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
-        <lineSegments ref={exponential} geometry={exponentialGeometry}>
+        <lineSegments ref={slow} geometry={slowGeometry}>
           <lineBasicMaterial transparent opacity={0} depthWrite={false} />
         </lineSegments>
-        <lineSegments ref={power} geometry={powerGeometry}>
+        <lineSegments ref={fast} geometry={fastGeometry}>
           <lineBasicMaterial transparent opacity={0} depthWrite={false} />
         </lineSegments>
         <mesh ref={cross} geometry={crossGeometry}>
@@ -427,7 +426,7 @@ function FinaleBloom() {
     }
     const window0 = clamp01((p - 0.86) / 0.06)
     const window1 = 1 - clamp01((p - 0.97) / 0.03)
-    const targetOpacity = clamp01(window0 * window1) * 0.85
+    const targetOpacity = clamp01(window0 * window1) * (scrollState.proofActive ? 0 : 0.85)
     const mat = points.current?.material as PointsMaterial | undefined
     if (mat) {
       mat.opacity += (targetOpacity - mat.opacity) * 0.08

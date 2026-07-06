@@ -190,9 +190,9 @@ export default function App() {
       <div className="content-layer">
         <Nav />
         <Hero />
-        <GrowthProof />
         <About />
         <Work />
+        <GrowthProof />
         <Footer />
       </div>
     </div>
