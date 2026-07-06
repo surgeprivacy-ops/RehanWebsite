@@ -4,7 +4,7 @@ import { useMediaQuery } from '../../lib/useMediaQuery'
 
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1)
 
-type Key = 'none' | 'about' | 'surge' | 'laffy' | 'finale'
+type Key = 'none' | 'surge' | 'laffy' | 'finale'
 
 /**
  * A thin line that draws itself around the edge of the screen, once, right

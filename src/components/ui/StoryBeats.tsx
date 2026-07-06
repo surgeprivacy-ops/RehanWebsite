@@ -5,9 +5,8 @@ import type { StorySequence } from '../../data/projects'
 
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1)
 
-/** The about chapter colors with the site's accent; projects use their own token. */
 function beatColorVar(key: StorySequence['key']) {
-  return key === 'about' ? 'var(--color-amber)' : `var(--color-${key})`
+  return `var(--color-${key})`
 }
 
 /**
@@ -16,7 +15,7 @@ function beatColorVar(key: StorySequence['key']) {
  * (0-1) drives which beat word is on screen and is written into the shared
  * scrollState singleton so the 3D scene can react to "which chapter is
  * currently being told" without any prop-drilling or re-renders here.
- * Powers the project intros and the personal About chapter alike.
+ * Powers the project intros.
  */
 export default function StoryBeats({ story }: { story: StorySequence }) {
   const wrapRef = useRef<HTMLDivElement>(null)

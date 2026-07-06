@@ -1,6 +1,6 @@
 /** A pinned scroll chapter: beats shown one at a time while the section is stuck. */
 export interface StorySequence {
-  key: 'about' | 'surge' | 'laffy'
+  key: 'surge' | 'laffy'
   /** Small label above the beat, e.g. "01 / 2026 — Surge". */
   meta: string
   beats: string[]
@@ -24,20 +24,13 @@ export function storyOf(p: CaseStudy): StorySequence {
   return { key: p.accent, meta: `${p.index} / ${p.year} — ${p.name}`, beats: p.beats }
 }
 
-/** Rehan's own chapter — the working loop, told the same way as the projects. */
-export const ABOUT_STORY: StorySequence = {
-  key: 'about',
-  meta: '00 — Rehan',
-  beats: ['Learn.', 'Build.', 'Break.', 'Rebuild.'],
-}
-
 export const CASE_STUDIES: CaseStudy[] = [
   {
     index: '01',
     name: 'Surge',
     tagline: 'Test. Review. Post.',
     description:
-      'An AI-assisted craft review platform for short-form video. Creators upload a cut before posting and get a retention-focused analysis — hook, pacing, text, tension, sync, ending — plus one editing hypothesis to test in the next version.',
+      'An AI-assisted video review platform for short-form videos, like Instagram Reels or TikToks. Creators upload a video before posting and get a comprehensive breakdown of how it might perform — plus clear feedback on exactly what they can do to post a stronger video.',
     stack: ['FastAPI', 'React', 'Neon Postgres', 'Gemini', 'Stripe'],
     url: 'https://surge-chi-khaki.vercel.app',
     linkLabel: 'Visit Surge',
@@ -50,7 +43,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     name: 'Laffy',
     tagline: 'Scan. Personalize. Unbox.',
     description:
-      'A premium AI skincare flow that turns a consent-based skin scan and short questionnaire into a personalized routine box. The homepage frames the product as a four-chapter system: scan, goals, routine, and box.',
+      'An AI skincare website that creates a personalized routine box from a skin scan and a short questionnaire. I am currently working on the licenses needed to actually sell these products in packages.',
     stack: ['React', 'Vite', 'AI Skin Scan', 'Routine Builder', 'Vercel'],
     url: 'https://laffyfinal.vercel.app/',
     linkLabel: 'Visit Laffy',

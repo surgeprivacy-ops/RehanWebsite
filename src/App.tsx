@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUpRight } from 'lucide-react'
-import { ABOUT_STORY, CASE_STUDIES, storyOf } from './data/projects'
+import { CASE_STUDIES, storyOf } from './data/projects'
 import { SOCIALS } from './data/socials'
 import { useReveal } from './lib/useReveal'
 import Cursor from './components/ui/Cursor'
@@ -54,9 +54,7 @@ function Hero() {
         Engineer — AI-native products
       </p>
       <h1 className="reveal relative z-[2] max-w-6xl font-serif text-[18vw] leading-[0.95] tracking-tight sm:text-[13vw] md:text-[8.5vw]">
-        Software that ships
-        <br />
-        <span className="italic text-amber">and survives.</span>
+        My Website
       </h1>
       <p className="reveal relative z-[2] mt-8 max-w-xl font-serif text-xl italic leading-relaxed text-muted sm:mt-10 sm:text-2xl">
         Slope over intercept.
@@ -72,24 +70,20 @@ function Hero() {
 
 function About() {
   return (
-    <>
-      {/* Rehan's own pinned chapter — the working loop, told like the projects' intros. */}
-      <StoryBeats story={ABOUT_STORY} />
-      <section
-        id="about"
-        data-act="about"
-        data-act-progress="0.2"
-        className="reveal border-t border-line px-4 py-20 sm:px-6 md:px-12 md:py-32"
-      >
-        <p className="text-sm tracking-[0.2em] uppercase text-muted sm:tracking-[0.25em]">About</p>
-        <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight tracking-tight sm:text-5xl md:text-6xl">
-          I design, build, and ship products <span className="italic text-amber">solo</span> — front end, back end, and everything in between.
-        </h2>
-        <p className="mt-8 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
-          I&rsquo;m an engineer who cares more about what survives contact with real users than what looks good in a demo. Surge and Laffy were both taken from a blank page to production by me — product decisions, infrastructure, and the unglamorous parts in between. I&rsquo;m happiest shipping something small, watching how it&rsquo;s actually used, and iterating from there.
-        </p>
-      </section>
-    </>
+    <section
+      id="about"
+      data-act="about"
+      data-act-progress="0.2"
+      className="reveal border-t border-line px-4 py-20 sm:px-6 md:px-12 md:py-32"
+    >
+      <p className="text-sm tracking-[0.2em] uppercase text-muted sm:tracking-[0.25em]">About</p>
+      <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight tracking-tight sm:text-5xl md:text-6xl">
+        I design, build, and ship products <span className="italic text-amber">solo</span> — front end, back end, and everything in between.
+      </h2>
+      <p className="mt-8 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+        I&rsquo;m an ambitious 16-year-old working to build a successful startup, and trust me, I will. Remember the name: Rehan Palagiri. I know building a startup is not easy; a lot of days are hard. But that is exactly why I&rsquo;m here: to get out of my comfort zone, take a leap of faith, and bet on myself. Age is honestly just a number. It does not define who I am or what I can accomplish.
+      </p>
+    </section>
   )
 }
 
@@ -168,7 +162,6 @@ function Footer() {
             </a>
           ))}
         </div>
-        <p className="reveal mt-12 text-sm text-muted">© 2026 Rehan. Developed in full color.</p>
       </div>
     </footer>
   )
