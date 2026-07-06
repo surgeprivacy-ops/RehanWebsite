@@ -1,3 +1,11 @@
+/** A pinned scroll chapter: beats shown one at a time while the section is stuck. */
+export interface StorySequence {
+  key: 'about' | 'surge' | 'laffy'
+  /** Small label above the beat, e.g. "01 / 2026 — Surge". */
+  meta: string
+  beats: string[]
+}
+
 export interface CaseStudy {
   index: string
   name: string
@@ -10,6 +18,17 @@ export interface CaseStudy {
   accent: 'surge' | 'laffy'
   /** The story beats scrubbed through while this project's intro is pinned. */
   beats: string[]
+}
+
+export function storyOf(p: CaseStudy): StorySequence {
+  return { key: p.accent, meta: `${p.index} / ${p.year} — ${p.name}`, beats: p.beats }
+}
+
+/** Rehan's own chapter — the working loop, told the same way as the projects. */
+export const ABOUT_STORY: StorySequence = {
+  key: 'about',
+  meta: '00 — Rehan',
+  beats: ['Learn.', 'Build.', 'Break.', 'Rebuild.'],
 }
 
 export const CASE_STUDIES: CaseStudy[] = [

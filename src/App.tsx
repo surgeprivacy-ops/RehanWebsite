@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUpRight } from 'lucide-react'
-import { CASE_STUDIES } from './data/projects'
+import { ABOUT_STORY, CASE_STUDIES, storyOf } from './data/projects'
 import { SOCIALS } from './data/socials'
 import { useReveal } from './lib/useReveal'
 import Cursor from './components/ui/Cursor'
@@ -8,7 +8,7 @@ import ScrollProgress from './components/ui/ScrollProgress'
 import SideRail from './components/ui/SideRail'
 import ScrollHint from './components/ui/ScrollHint'
 import Preloader from './components/ui/Preloader'
-import ProjectStory from './components/ui/ProjectStory'
+import StoryBeats from './components/ui/StoryBeats'
 import SectionFrame from './components/ui/SectionFrame'
 import ColorDirector from './components/ColorDirector'
 import BackgroundCanvas from './components/canvas/BackgroundCanvas'
@@ -71,20 +71,24 @@ function Hero() {
 
 function About() {
   return (
-    <section
-      id="about"
-      data-act="about"
-      data-act-progress="0.2"
-      className="reveal border-t border-line px-4 py-20 sm:px-6 md:px-12 md:py-32"
-    >
-      <p className="text-sm tracking-[0.2em] uppercase text-muted sm:tracking-[0.25em]">About</p>
-      <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight tracking-tight sm:text-5xl md:text-6xl">
-        I design, build, and ship products <span className="italic text-amber">solo</span> — front end, back end, and everything in between.
-      </h2>
-      <p className="mt-8 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
-        I&rsquo;m an engineer who cares more about what survives contact with real users than what looks good in a demo. Surge and Laffy were both taken from a blank page to production by me — product decisions, infrastructure, and the unglamorous parts in between. I&rsquo;m happiest shipping something small, watching how it&rsquo;s actually used, and iterating from there.
-      </p>
-    </section>
+    <>
+      {/* Rehan's own pinned chapter — the working loop, told like the projects' intros. */}
+      <StoryBeats story={ABOUT_STORY} />
+      <section
+        id="about"
+        data-act="about"
+        data-act-progress="0.2"
+        className="reveal border-t border-line px-4 py-20 sm:px-6 md:px-12 md:py-32"
+      >
+        <p className="text-sm tracking-[0.2em] uppercase text-muted sm:tracking-[0.25em]">About</p>
+        <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight tracking-tight sm:text-5xl md:text-6xl">
+          I design, build, and ship products <span className="italic text-amber">solo</span> — front end, back end, and everything in between.
+        </h2>
+        <p className="mt-8 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+          I&rsquo;m an engineer who cares more about what survives contact with real users than what looks good in a demo. Surge and Laffy were both taken from a blank page to production by me — product decisions, infrastructure, and the unglamorous parts in between. I&rsquo;m happiest shipping something small, watching how it&rsquo;s actually used, and iterating from there.
+        </p>
+      </section>
+    </>
   )
 }
 
@@ -93,7 +97,7 @@ function Work() {
     <section id="work" data-act="work" data-act-progress="0.45" className="border-t border-line">
       {CASE_STUDIES.map((p) => (
         <div key={p.name}>
-          <ProjectStory project={p} />
+          <StoryBeats story={storyOf(p)} />
           <article
             className={`work-card accent-${p.accent} reveal grid gap-8 border-b border-line px-4 py-16 sm:px-6 sm:py-20 md:grid-cols-12 md:gap-10 md:px-12 md:py-32`}
           >

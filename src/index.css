@@ -15,6 +15,12 @@
 html {
   scroll-behavior: smooth;
   background: var(--color-ink);
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge/IE */
+}
+
+html::-webkit-scrollbar {
+  display: none; /* Chrome/Safari — scrolling still works, just no visible track */
 }
 
 body {
@@ -270,6 +276,10 @@ body {
   stroke: var(--color-amber);
   stroke-width: 1.4;
   transition: stroke 0.4s ease;
+}
+.mobile-knot-tip {
+  fill: var(--color-amber);
+  transition: fill 0.4s ease;
 }
 
 /* finale flood */

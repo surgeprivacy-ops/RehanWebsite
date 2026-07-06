@@ -12,9 +12,9 @@ export const scrollState = {
   isFlooded: false,
   palette: samplePalette(0),
   hoverAccent: null as [number, number, number] | null,
-  /** Which project's pinned story section is currently scrubbing, if any. */
-  activeProject: 'none' as 'none' | 'surge' | 'laffy',
-  /** 0-1 local progress through the active project's pinned section. */
+  /** Which pinned story chapter is currently scrubbing, if any. */
+  activeProject: 'none' as 'none' | 'about' | 'surge' | 'laffy',
+  /** 0-1 local progress through the active chapter's pinned section. */
   projectProgress: 0,
 }
 
