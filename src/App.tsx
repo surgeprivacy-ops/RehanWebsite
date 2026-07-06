@@ -78,10 +78,10 @@ function About() {
     >
       <p className="text-sm tracking-[0.2em] uppercase text-muted sm:tracking-[0.25em]">About</p>
       <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight tracking-tight sm:text-5xl md:text-6xl">
-        I design, build, and ship products <span className="italic text-amber">solo</span> — front end, back end, and everything in between.
+        About Me
       </h2>
       <p className="mt-8 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
-        I&rsquo;m an ambitious 16-year-old working to build a successful startup, and trust me, I will. Remember the name: Rehan Palagiri. I know building a startup is not easy; a lot of days are hard. But that is exactly why I&rsquo;m here: to get out of my comfort zone, take a leap of faith, and bet on myself. Age is honestly just a number. It does not define who I am or what I can accomplish.
+        Hey, my name is Rehan Palagiri. I am an ambitious 16 year old who is looking to create a successful start up, and trust me I will. I know it might sound bold and even cocky, but I urge you to remember the name, Rehan Palagiri. I know creating a startup is not easy, a lot of days it is very hard, but that is what I am here for. To get out of my comfort zone and take a leap of faith, and bet on myself. Age is honestly just a number, it does not reflect who I am and what I can accomplish. My main motto is to bet on the slope over intercept, because where you start does not decide where you end up.
       </p>
     </section>
   )

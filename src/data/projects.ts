@@ -30,7 +30,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     name: 'Surge',
     tagline: 'Test. Review. Post.',
     description:
-      'An AI-assisted video review platform for short-form videos, like Instagram Reels or TikToks. Creators upload a video before posting and get a comprehensive breakdown of how it might perform — plus clear feedback on exactly what they can do to post a stronger video.',
+      'An AI-assisted video review platform for short-form videos on Instagram or TikTok. Creators upload a video before posting and get a comprehensive breakdown of how it would do — plus feedback on exactly what they can do to post a successful video.',
     stack: ['FastAPI', 'React', 'Neon Postgres', 'Gemini', 'Stripe'],
     url: 'https://surge-chi-khaki.vercel.app',
     linkLabel: 'Visit Surge',
@@ -43,7 +43,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     name: 'Laffy',
     tagline: 'Scan. Personalize. Unbox.',
     description:
-      'An AI skincare website that creates a personalized routine box from a skin scan and a short questionnaire. I am currently working on the licenses needed to actually sell these products in packages.',
+      'An AI skincare website that creates a personalized routine box from a skin scan and a short questionnaire. I am currently working to get the licenses needed to actually sell these products in packages.',
     stack: ['React', 'Vite', 'AI Skin Scan', 'Routine Builder', 'Vercel'],
     url: 'https://laffyfinal.vercel.app/',
     linkLabel: 'Visit Laffy',
