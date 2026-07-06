@@ -9,6 +9,7 @@ import SideRail from './components/ui/SideRail'
 import ScrollHint from './components/ui/ScrollHint'
 import Preloader from './components/ui/Preloader'
 import StoryBeats from './components/ui/StoryBeats'
+import GrowthProof from './components/ui/GrowthProof'
 import SectionFrame from './components/ui/SectionFrame'
 import ColorDirector from './components/ColorDirector'
 import BackgroundCanvas from './components/canvas/BackgroundCanvas'
@@ -189,6 +190,7 @@ export default function App() {
       <div className="content-layer">
         <Nav />
         <Hero />
+        <GrowthProof />
         <About />
         <Work />
         <Footer />

@@ -26,25 +26,25 @@ import type {
   PointsMaterial,
 } from 'three'
 import { scrollState } from '../../lib/scrollState'
+import { CROSS_T, POWER_EXPONENT, X_DOMAIN } from '../../lib/growthChart'
 
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1)
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
 
 /**
- * Waypoints the slope drifts through as the page scrolls (0 = top, 1 = bottom).
- * x/y are world-space offsets, s is scale, o is opacity. The drift is modest —
- * the slope is ~5.4 world units wide, so it mostly stays put (center-right)
- * and the story is told by how much of it has been drawn, not by travel.
- * Colors are NOT set here — they come only from scrollState.palette, sampled
- * once per frame, so the DOM and the 3D world always agree.
+ * Waypoints the debris field and particle blooms drift through as the page
+ * scrolls (0 = top, 1 = bottom). x/y are world-space offsets, s is scale,
+ * o is opacity. Colors are NOT set here — they come only from
+ * scrollState.palette, sampled once per frame, so the DOM and the 3D world
+ * always agree.
  */
 type Waypoint = { at: number; x: number; y: number; s: number; o: number }
 const WAYPOINTS: Waypoint[] = [
-  { at: 0.0, x: 1.1, y: -0.25, s: 1.0, o: 0.95 }, // hero: slope base rising bottom-right
-  { at: 0.25, x: 1.35, y: -0.6, s: 0.92, o: 0.82 }, // about/work: settles lower, behind text
-  { at: 0.6, x: 1.4, y: -0.75, s: 0.9, o: 0.78 }, // drifts through the case studies
-  { at: 0.88, x: 1.2, y: -0.5, s: 0.98, o: 0.88 }, // rises again approaching the finale
-  { at: 1.0, x: 1.1, y: -0.3, s: 1.05, o: 0.95 }, // footer: full slope, rose, in the flood
+  { at: 0.0, x: 1.1, y: -0.25, s: 1.0, o: 0.95 },
+  { at: 0.25, x: 1.35, y: -0.6, s: 0.92, o: 0.82 },
+  { at: 0.6, x: 1.4, y: -0.75, s: 0.9, o: 0.78 },
+  { at: 0.88, x: 1.2, y: -0.5, s: 0.98, o: 0.88 },
+  { at: 1.0, x: 1.1, y: -0.3, s: 1.05, o: 0.95 }, // footer: rose, in the flood
 ]
 
 function sample(p: number): Omit<Waypoint, 'at'> {
@@ -66,33 +66,32 @@ function sample(p: number): Omit<Waypoint, 'at'> {
 }
 
 /**
- * "Slope over intercept," literally: a gently accelerating ascent. The rise
- * uses t^1.7 so the curve starts shallow and steepens toward the end — the
- * growth story — and a small z undulation gives the tube real depth so toon
- * shading reads it as a 3D object rather than a flat ribbon.
+ * The two curves of the proof section, literally: x^1.01 (compounds, starts
+ * at 0) racing a flat 1^x (never moves, starts at 1). Both share the same
+ * world-space span so t=0..1 walks real x=0..X_DOMAIN on either curve. A
+ * small z undulation on the power curve gives its tube real depth so toon
+ * shading reads it as a 3D object rather than a flat ribbon; the flat line
+ * stays perfectly planar to read as "unchanging" beside it.
  */
-const SLOPE_SPAN_X = 5.4
-const SLOPE_RISE = 2.6
-const SLOPE_BASE_Y = -1.2
+const CHART_SPAN_X = 4.6
+const CHART_Y_SCALE = 0.42
+const CHART_BASE_Y = -1.05
 
-class SlopePath extends Curve<Vector3> {
-  constructor() {
-    super()
-  }
-
+class PowerCurvePath extends Curve<Vector3> {
   getPoint(t: number, optionalTarget = new Vector3()) {
+    const real = Math.pow(t * X_DOMAIN, POWER_EXPONENT)
     return optionalTarget.set(
-      (t - 0.5) * SLOPE_SPAN_X,
-      SLOPE_BASE_Y + SLOPE_RISE * Math.pow(t, 1.7),
-      Math.sin(t * Math.PI * 2.2) * 0.22,
+      (t - 0.5) * CHART_SPAN_X,
+      CHART_BASE_Y + CHART_Y_SCALE * real,
+      Math.sin(t * Math.PI * 2) * 0.14,
     )
   }
 }
 
-/** How much of the slope is drawn at page scroll p: never empty (the hero
- *  shows the base of the climb), complete only at the very bottom. */
-function drawProgressFor(p: number) {
-  return 0.12 + 0.88 * clamp01(p)
+class FlatCurvePath extends Curve<Vector3> {
+  getPoint(t: number, optionalTarget = new Vector3()) {
+    return optionalTarget.set((t - 0.5) * CHART_SPAN_X, CHART_BASE_Y + CHART_Y_SCALE, 0)
+  }
 }
 
 /** 3-step gradient map for the toon material — the cel-shaded look. */
@@ -111,121 +110,126 @@ function useToonGradientMap() {
 
 const scratchSolid = new Color()
 const scratchOutline = new Color()
-const scratchProjectAccent = new Color()
 
-const slopePath = new SlopePath()
-const scratchTip = new Vector3()
+const powerCurvePath = new PowerCurvePath()
+const flatCurvePath = new FlatCurvePath()
+const scratchCrossPoint = new Vector3()
 
 /**
- * The ascending slope that draws itself as the page scrolls — no morphing,
- * no topology change, ever. The tube geometry is built once; each frame only
- * drawRange moves (which indices the GPU renders), so the curve extends
- * upward as the visitor descends the page. A small tip marker rides the end
- * of the drawn portion: "you are here" on the climb.
+ * The proof section's two curves, drawing themselves as the visitor scrolls
+ * through it — no morphing, no topology change, ever. Each tube geometry is
+ * built once; each frame only drawRange moves, so both curves extend
+ * together from local progress written by <GrowthProof>. A marker fades in
+ * at (1, 1) — real x=1 — the instant the draw passes the point where x^1.01
+ * overtakes the flat line for good.
  */
-function Slope({ lite }: { lite: boolean }) {
+function GrowthChart({ lite }: { lite: boolean }) {
   const rig = useRef<Group>(null)
-  const solid = useRef<Mesh>(null)
-  const outline = useRef<Mesh>(null)
-  const tip = useRef<Mesh>(null)
-  const draw = useRef(drawProgressFor(0))
-  const surgeMix = useRef(0)
-  const laffyMix = useRef(0)
+  const power = useRef<Mesh>(null)
+  const powerOutline = useRef<Mesh>(null)
+  const flat = useRef<Mesh>(null)
+  const flatOutline = useRef<Mesh>(null)
+  const cross = useRef<Mesh>(null)
+  const draw = useRef(0)
+  const activeMix = useRef(0)
   const gradientMap = useToonGradientMap()
-  const geometry = useMemo(
-    () => (lite ? new TubeGeometry(slopePath, 120, 0.16, 12, false) : new TubeGeometry(slopePath, 240, 0.16, 24, false)),
+  const powerGeometry = useMemo(
+    () => (lite ? new TubeGeometry(powerCurvePath, 100, 0.14, 12, false) : new TubeGeometry(powerCurvePath, 200, 0.14, 20, false)),
     [lite],
   )
-  const tipGeometry = useMemo(() => new IcosahedronGeometry(0.2, 0), [])
-  const indexCount = geometry.index ? geometry.index.count : 0
+  const flatGeometry = useMemo(
+    () => (lite ? new TubeGeometry(flatCurvePath, 100, 0.09, 12, false) : new TubeGeometry(flatCurvePath, 200, 0.09, 20, false)),
+    [lite],
+  )
+  const crossGeometry = useMemo(() => new IcosahedronGeometry(0.16, 0), [])
+  const powerIndexCount = powerGeometry.index ? powerGeometry.index.count : 0
+  const flatIndexCount = flatGeometry.index ? flatGeometry.index.count : 0
 
   useFrame((state) => {
-    const max = document.documentElement.scrollHeight - window.innerHeight
-    const p = max > 0 ? clamp01(window.scrollY / max) : 0
-    const k = sample(p)
+    const target = scrollState.proofActive ? 1 : 0
+    activeMix.current += (target - activeMix.current) * 0.06
+    draw.current += (scrollState.proofProgress - draw.current) * 0.08
 
-    draw.current += (drawProgressFor(p) - draw.current) * 0.05
-    // Snap the visible index count to whole triangles so the cut end stays clean.
-    const visible = Math.min(indexCount, Math.floor((indexCount * draw.current) / 3) * 3)
-    geometry.setDrawRange(0, visible)
+    const visiblePower = Math.min(powerIndexCount, Math.floor((powerIndexCount * draw.current) / 3) * 3)
+    powerGeometry.setDrawRange(0, visiblePower)
+    const visibleFlat = Math.min(flatIndexCount, Math.floor((flatIndexCount * draw.current) / 3) * 3)
+    flatGeometry.setDrawRange(0, visibleFlat)
 
     if (rig.current) {
-      rig.current.position.x += (k.x - rig.current.position.x) * 0.045
-      rig.current.position.y += (k.y - rig.current.position.y) * 0.045
-      const s = rig.current.scale.x + (k.s - rig.current.scale.x) * 0.07
-      rig.current.scale.setScalar(s)
-      // Gentle parallax only — the tube has real z-depth from its undulation,
-      // so a small tilt adds dimension without foreshortening it into a line.
-      const targetRotY = state.pointer.x * 0.15
-      const targetRotX = state.pointer.y * -0.1
+      // Gentle parallax only — the power tube has real z-depth from its
+      // undulation, so a small tilt adds dimension without foreshortening it.
+      const targetRotY = state.pointer.x * 0.12
+      const targetRotX = state.pointer.y * -0.08
       rig.current.rotation.y += (targetRotY - rig.current.rotation.y) * 0.05
       rig.current.rotation.x += (targetRotX - rig.current.rotation.x) * 0.05
     }
 
-    // The tip marker sits at the end of the drawn portion of the curve
-    // (local coordinates — it lives inside the same rig/Float transform).
-    if (tip.current) {
-      slopePath.getPoint(draw.current, scratchTip)
-      tip.current.position.copy(scratchTip)
-      tip.current.rotation.y += 0.01
-      tip.current.rotation.z += 0.004
+    // The crossover marker sits at (1, 1) in real terms and fades in once
+    // the draw has actually passed it, never before.
+    if (cross.current) {
+      powerCurvePath.getPoint(CROSS_T, scratchCrossPoint)
+      cross.current.position.copy(scratchCrossPoint)
+      cross.current.rotation.y += 0.012
+      cross.current.rotation.z += 0.005
     }
 
-    // Each project's pinned story tints the whole climb: Surge cools it
-    // toward teal, Laffy warms it toward rose; the emissive lift makes the
-    // slope glow slightly brighter while a story is being told.
-    surgeMix.current += ((scrollState.activeProject === 'surge' ? 1 : 0) - surgeMix.current) * 0.05
-    laffyMix.current += ((scrollState.activeProject === 'laffy' ? 1 : 0) - laffyMix.current) * 0.05
+    const { paperRgb, accentRgb, inkRgb, dev } = scrollState.palette
+    const baseOpacity = activeMix.current * 0.95
 
-    const { paperRgb, accentRgb, surgeRgb, laffyRgb, inkRgb, dev } = scrollState.palette
-    scratchSolid.setRGB(
-      paperRgb[0] + (accentRgb[0] - paperRgb[0]) * dev * 0.65,
-      paperRgb[1] + (accentRgb[1] - paperRgb[1]) * dev * 0.65,
-      paperRgb[2] + (accentRgb[2] - paperRgb[2]) * dev * 0.65,
-    )
-    if (surgeMix.current > 0.01) {
-      scratchProjectAccent.setRGB(surgeRgb[0], surgeRgb[1], surgeRgb[2])
-      scratchSolid.lerp(scratchProjectAccent, surgeMix.current * 0.85)
-    }
-    if (laffyMix.current > 0.01) {
-      scratchProjectAccent.setRGB(laffyRgb[0], laffyRgb[1], laffyRgb[2])
-      scratchSolid.lerp(scratchProjectAccent, laffyMix.current * 0.85)
-    }
+    // The power curve is the story's protagonist — it takes the accent color.
+    scratchSolid.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
     scratchOutline.setRGB(inkRgb[0], inkRgb[1], inkRgb[2])
+    const powerMat = power.current?.material as MeshToonMaterial | undefined
+    if (powerMat) {
+      powerMat.opacity += (baseOpacity - powerMat.opacity) * 0.08
+      powerMat.color.copy(scratchSolid)
+      powerMat.emissive.copy(scratchSolid).multiplyScalar(0.2 + dev * 0.15)
+    }
+    const powerOutlineMat = powerOutline.current?.material as MeshBasicMaterial | undefined
+    if (powerOutlineMat && powerMat) {
+      powerOutlineMat.opacity = powerMat.opacity * 0.85
+      powerOutlineMat.color.copy(scratchOutline)
+    }
 
-    const storyGlow = (surgeMix.current + laffyMix.current) * 0.12
-    const mat = solid.current?.material as MeshToonMaterial | undefined
-    if (mat) {
-      mat.opacity += (k.o - mat.opacity) * 0.08
-      mat.color.copy(scratchSolid)
-      mat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15 + storyGlow)
+    // The flat line stays muted — it never changes, so it never draws the eye.
+    scratchSolid.setRGB(paperRgb[0], paperRgb[1], paperRgb[2])
+    const flatMat = flat.current?.material as MeshToonMaterial | undefined
+    if (flatMat) {
+      flatMat.opacity += (baseOpacity * 0.75 - flatMat.opacity) * 0.08
+      flatMat.color.copy(scratchSolid)
+      flatMat.emissive.copy(scratchSolid).multiplyScalar(0.08)
     }
-    const outlineMat = outline.current?.material as MeshBasicMaterial | undefined
-    if (outlineMat && mat) {
-      outlineMat.opacity = mat.opacity * 0.85
-      outlineMat.color.copy(scratchOutline)
+    const flatOutlineMat = flatOutline.current?.material as MeshBasicMaterial | undefined
+    if (flatOutlineMat && flatMat) {
+      flatOutlineMat.opacity = flatMat.opacity * 0.85
+      flatOutlineMat.color.copy(scratchOutline)
     }
-    const tipMat = tip.current?.material as MeshToonMaterial | undefined
-    if (tipMat && mat) {
-      tipMat.opacity += (k.o - tipMat.opacity) * 0.08
-      tipMat.color.copy(scratchSolid)
-      tipMat.emissive.copy(scratchSolid).multiplyScalar(0.35 + storyGlow)
+
+    const crossTarget = draw.current >= CROSS_T ? baseOpacity : 0
+    const crossMat = cross.current?.material as MeshToonMaterial | undefined
+    if (crossMat) {
+      crossMat.opacity += (crossTarget - crossMat.opacity) * 0.1
+      crossMat.color.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
+      crossMat.emissive.setRGB(accentRgb[0], accentRgb[1], accentRgb[2]).multiplyScalar(0.4)
     }
   })
 
   return (
-    <group ref={rig}>
-      <Float speed={1.3} rotationIntensity={0.15} floatIntensity={0.6}>
-        <mesh ref={solid} geometry={geometry}>
+    <group ref={rig} position={[1.15, -0.15, 0]}>
+      <Float speed={1.1} rotationIntensity={0.12} floatIntensity={0.5}>
+        <mesh ref={power} geometry={powerGeometry}>
           <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
         </mesh>
-        {/* Small multiplier: the slope reaches far from the origin, so a
-            uniform scale-up drifts the outline more at the ends than the
-            middle — keep it tight so the rim never visibly detaches. */}
-        <mesh ref={outline} geometry={geometry} scale={1.008}>
+        <mesh ref={powerOutline} geometry={powerGeometry} scale={1.01}>
           <meshBasicMaterial side={BackSide} transparent opacity={0} />
         </mesh>
-        <mesh ref={tip} geometry={tipGeometry}>
+        <mesh ref={flat} geometry={flatGeometry}>
+          <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
+        </mesh>
+        <mesh ref={flatOutline} geometry={flatGeometry} scale={1.01}>
+          <meshBasicMaterial side={BackSide} transparent opacity={0} />
+        </mesh>
+        <mesh ref={cross} geometry={crossGeometry}>
           <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
         </mesh>
       </Float>
@@ -339,8 +343,8 @@ function FinaleBloom() {
     const p = max > 0 ? clamp01(window.scrollY / max) : 0
     const k = sample(p)
     if (points.current) {
-      // Bloom at the summit — the top end of the fully-drawn slope.
-      points.current.position.set(k.x + (SLOPE_SPAN_X / 2) * k.s, k.y + (SLOPE_BASE_Y + SLOPE_RISE) * k.s, 0)
+      // Bloom drifts with the waypoint track, riding slightly above it.
+      points.current.position.set(k.x + 1.35 * k.s, k.y + 1.4 * k.s, 0)
       points.current.rotation.y += 0.0015
     }
     const window0 = clamp01((p - 0.86) / 0.06)
@@ -414,7 +418,7 @@ export default function BackgroundScene({ lite = false }: { lite?: boolean }) {
       onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
     >
       <Lights />
-      <Slope lite={lite} />
+      <GrowthChart lite={lite} />
       {!lite && <DebrisCorridor />}
       <LaffyBloom />
       <FinaleBloom />

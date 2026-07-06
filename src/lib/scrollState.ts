@@ -16,6 +16,10 @@ export const scrollState = {
   activeProject: 'none' as 'none' | 'about' | 'surge' | 'laffy',
   /** 0-1 local progress through the active chapter's pinned section. */
   projectProgress: 0,
+  /** 0-1 local scroll progress through the growth-chart proof section (clamped: 0 before, 1 after). */
+  proofProgress: 0,
+  /** Whether the proof section's pinned viewport is roughly on screen — drives the chart's fade. */
+  proofActive: false,
 }
 
 export function updateScrollState(rawProgress: number, damping = 0.07) {
