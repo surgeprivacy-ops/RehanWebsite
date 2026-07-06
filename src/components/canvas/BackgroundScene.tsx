@@ -213,10 +213,16 @@ function GrowthChart({ lite }: { lite: boolean }) {
   const fastPointCount = fastGeometry.getAttribute('position').count
   const slowPointCount = slowGeometry.getAttribute('position').count
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
+    // Delta-time smoothing so the draw tracks scroll identically on 60Hz,
+    // 120Hz, and throttled tabs — a fixed per-frame lerp lags badly when the
+    // frame rate drops and overshoots the feel when it rises.
+    const eFade = 1 - Math.exp(-3.6 * delta)
+    const eDraw = 1 - Math.exp(-4.8 * delta)
+
     const target = scrollState.proofActive ? 1 : 0
-    activeMix.current += (target - activeMix.current) * 0.06
-    draw.current += (scrollState.proofProgress - draw.current) * 0.08
+    activeMix.current += (target - activeMix.current) * eFade
+    draw.current += (scrollState.proofProgress - draw.current) * eDraw
 
     const visibleFast = Math.min(fastPointCount, Math.floor((fastPointCount * draw.current) / 2) * 2)
     fastGeometry.setDrawRange(0, visibleFast)
@@ -226,10 +232,10 @@ function GrowthChart({ lite }: { lite: boolean }) {
     if (rig.current) {
       const targetRotY = state.pointer.x * 0.045
       const targetRotX = state.pointer.y * -0.03
-      rig.current.rotation.y += (targetRotY - rig.current.rotation.y) * 0.05
-      rig.current.rotation.x += (targetRotX - rig.current.rotation.x) * 0.05
+      rig.current.rotation.y += (targetRotY - rig.current.rotation.y) * eFade
+      rig.current.rotation.x += (targetRotX - rig.current.rotation.x) * eFade
       const targetScale = Math.min(1, (state.viewport.width * 0.88) / CHART_FIT_WIDTH)
-      const scale = rig.current.scale.x + (targetScale - rig.current.scale.x) * 0.08
+      const scale = rig.current.scale.x + (targetScale - rig.current.scale.x) * eDraw
       rig.current.scale.setScalar(scale)
     }
 
@@ -246,40 +252,40 @@ function GrowthChart({ lite }: { lite: boolean }) {
 
     const gridMat = grid.current?.material as LineBasicMaterial | undefined
     if (gridMat) {
-      gridMat.opacity += (baseOpacity * 0.16 - gridMat.opacity) * 0.08
+      gridMat.opacity += (baseOpacity * 0.16 - gridMat.opacity) * eDraw
       gridMat.color.copy(scratchSolid)
     }
 
     const axesMat = axes.current?.material as LineBasicMaterial | undefined
     if (axesMat) {
-      axesMat.opacity += (baseOpacity * 0.55 - axesMat.opacity) * 0.08
+      axesMat.opacity += (baseOpacity * 0.55 - axesMat.opacity) * eDraw
       axesMat.color.copy(scratchSolid)
     }
 
     for (const arrow of [arrowX.current, arrowY.current]) {
       const mat = arrow?.material as MeshBasicMaterial | undefined
       if (mat) {
-        mat.opacity += (baseOpacity * 0.72 - mat.opacity) * 0.08
+        mat.opacity += (baseOpacity * 0.72 - mat.opacity) * eDraw
         mat.color.copy(scratchSolid)
       }
     }
 
     const fastMat = fast.current?.material as LineBasicMaterial | undefined
     if (fastMat) {
-      fastMat.opacity += (baseOpacity - fastMat.opacity) * 0.08
+      fastMat.opacity += (baseOpacity - fastMat.opacity) * eDraw
       fastMat.color.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
     }
 
     const slowMat = slow.current?.material as LineBasicMaterial | undefined
     if (slowMat) {
-      slowMat.opacity += (baseOpacity * 0.68 - slowMat.opacity) * 0.08
+      slowMat.opacity += (baseOpacity * 0.68 - slowMat.opacity) * eDraw
       slowMat.color.copy(scratchSolid)
     }
 
     const crossTarget = draw.current >= CROSS_T ? baseOpacity * 0.45 : 0
     const crossMat = cross.current?.material as MeshBasicMaterial | undefined
     if (crossMat) {
-      crossMat.opacity += (crossTarget - crossMat.opacity) * 0.1
+      crossMat.opacity += (crossTarget - crossMat.opacity) * eDraw
       crossMat.color.setRGB(accentRgb[0], accentRgb[1], accentRgb[2])
     }
   })
