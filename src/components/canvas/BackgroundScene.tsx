@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Float } from '@react-three/drei'
 import {
@@ -29,25 +29,22 @@ import { scrollState } from '../../lib/scrollState'
 
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1)
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
-const LINE_TILT = -0.08
-const CAMERA_Z = 5.5
-const CAMERA_FOV = 45
 
 /**
- * Waypoints the shape travels through as the page scrolls (0 = top, 1 = bottom).
- * x/y are world-space offsets, s is scale, o is opacity, m is line morph amount.
+ * Waypoints the slope drifts through as the page scrolls (0 = top, 1 = bottom).
+ * x/y are world-space offsets, s is scale, o is opacity. The drift is modest —
+ * the slope is ~5.4 world units wide, so it mostly stays put (center-right)
+ * and the story is told by how much of it has been drawn, not by travel.
  * Colors are NOT set here — they come only from scrollState.palette, sampled
  * once per frame, so the DOM and the 3D world always agree.
  */
-type Waypoint = { at: number; x: number; y: number; s: number; o: number; m: number }
+type Waypoint = { at: number; x: number; y: number; s: number; o: number }
 const WAYPOINTS: Waypoint[] = [
-  { at: 0.0, x: 2.55, y: 0.0, s: 1.94, o: 0.95, m: 0 }, // hero: full circle, right side, front and center (scale bumped to compensate for COIL_LENGTH's smaller resting radius)
-  { at: 0.1, x: 1.9, y: -0.4, s: 1.05, o: 0.85, m: 0.3 }, // begins unraveling into the line
-  { at: 0.22, x: 1.3, y: -0.9, s: 0.85, o: 0.78, m: 1 }, // work: fully a line now, still clearly visible
-  { at: 0.55, x: 1.45, y: -0.9, s: 0.8, o: 0.75, m: 1 }, // drifts through whitespace, staying present
-  { at: 0.78, x: 1.1, y: -1.1, s: 0.92, o: 0.8, m: 0.75 }, // starts tying back together
-  { at: 0.92, x: 1.1, y: -0.72, s: 1.0, o: 0.85, m: 0.38 }, // reforms before footer
-  { at: 1.0, x: 1.45, y: -0.42, s: 1.15, o: 0.92, m: 0 }, // footer: circle returns, rose, in the flood
+  { at: 0.0, x: 1.1, y: -0.25, s: 1.0, o: 0.95 }, // hero: slope base rising bottom-right
+  { at: 0.25, x: 1.35, y: -0.6, s: 0.92, o: 0.82 }, // about/work: settles lower, behind text
+  { at: 0.6, x: 1.4, y: -0.75, s: 0.9, o: 0.78 }, // drifts through the case studies
+  { at: 0.88, x: 1.2, y: -0.5, s: 0.98, o: 0.88 }, // rises again approaching the finale
+  { at: 1.0, x: 1.1, y: -0.3, s: 1.05, o: 0.95 }, // footer: full slope, rose, in the flood
 ]
 
 function sample(p: number): Omit<Waypoint, 'at'> {
@@ -62,139 +59,40 @@ function sample(p: number): Omit<Waypoint, 'at'> {
         y: a.y + (b.y - a.y) * e,
         s: a.s + (b.s - a.s) * e,
         o: a.o + (b.o - a.o) * e,
-        m: a.m + (b.m - a.m) * e,
       }
     }
   }
   return WAYPOINTS[WAYPOINTS.length - 1]
 }
 
-function screenYToWorld(y: number) {
-  const visibleWorldHeight = 2 * Math.tan((CAMERA_FOV * Math.PI / 180) / 2) * CAMERA_Z
-  return (window.innerHeight / 2 - y) * (visibleWorldHeight / window.innerHeight)
-}
-
-function chooseQuietWorldY() {
-  const width = window.innerWidth
-  const height = window.innerHeight
-  const candidates = [0.36, 0.49, 0.62, 0.75].map((n) => n * height)
-  const blockers = Array.from(
-    document.querySelectorAll<HTMLElement>('header h1, header p, header a, section h2, section p, section a, section li, footer h2, footer p, footer a'),
-  )
-    .map((el) => el.getBoundingClientRect())
-    .filter((r) => r.width > 0 && r.height > 0 && r.bottom > 72 && r.top < height)
-
-  const best = candidates.reduce((winner, candidate) => {
-    const score = blockers.reduce((sum, rect) => {
-      const center = (rect.top + rect.bottom) / 2
-      const danger = rect.height / 2 + 58
-      const overlap = Math.max(0, danger - Math.abs(candidate - center))
-      return sum + overlap * Math.min(rect.width / width, 1)
-    }, 0)
-
-    return score < winner.score ? { y: candidate, score } : winner
-  }, { y: candidates[0], score: Number.POSITIVE_INFINITY })
-
-  return screenYToWorld(best.y)
-}
-
 /**
- * Deliberately NOT the true circumference of the resting circle (that would
- * be ~8.17 for a radius-1.3 circle). Preserving exact arc length forces the
- * radius to grow without bound as the angular span shrinks toward a line —
- * by the later keyframes it had ballooned to ~3x its resting size and filled
- * most of the viewport, reading as "a huge ring" rather than a shape
- * unraveling. Keeping this modest caps how large the radius ever gets
- * (~2x resting size at most), at the cost of the coil "compressing" a
- * little as it opens — a small, invisible cheat for a much more contained
- * shape. The resting circle's radius (m=0) comes out to COIL_LENGTH/2π≈0.86;
- * the hero waypoint's scale is bumped up to compensate (see WAYPOINTS).
+ * "Slope over intercept," literally: a gently accelerating ascent. The rise
+ * uses t^1.7 so the curve starts shallow and steepens toward the end — the
+ * growth story — and a small z undulation gives the tube real depth so toon
+ * shading reads it as a 3D object rather than a flat ribbon.
  */
-const COIL_LENGTH = 5.4
+const SLOPE_SPAN_X = 5.4
+const SLOPE_RISE = 2.6
+const SLOPE_BASE_Y = -1.2
 
-/**
- * A point on the "opening coil" family: at m=0 this traces a circle; at m=1
- * it's an exact straight line of length COIL_LENGTH; in between it's a
- * circular arc that widens its angular span down to 0 as m rises — the
- * shape you'd get by holding a loop of wire and progressively straightening
- * it, not a per-vertex lerp between two unrelated shapes (which looks like
- * the ends sliding through each other rather than uncurling).
- */
-function unrollPoint(t: number, m: number, out: Vector3) {
-  const totalAngle = (1 - m) * Math.PI * 2
-  if (totalAngle < 1e-3) {
-    out.set((t - 0.5) * COIL_LENGTH, 0, 0)
-    return out
-  }
-  const radius = COIL_LENGTH / totalAngle
-  const angle = (t - 0.5) * totalAngle
-  const half = totalAngle / 2
-  // Shift so the shape stays centered on the local origin at every m (not
-  // just at the endpoints) — otherwise the spin group, which rotates around
-  // local origin, would make the coil visibly orbit instead of spin in place.
-  const shift = (radius * (1 - Math.cos(half))) / 2
-  out.set(radius * Math.sin(angle), radius * (1 - Math.cos(angle)) - shift, 0)
-  return out
-}
-
-class UnrollPath extends Curve<Vector3> {
-  m: number
-
-  constructor(m: number) {
+class SlopePath extends Curve<Vector3> {
+  constructor() {
     super()
-    this.m = m
   }
 
-  getPoint(t: number) {
-    return unrollPoint(t, this.m, new Vector3())
+  getPoint(t: number, optionalTarget = new Vector3()) {
+    return optionalTarget.set(
+      (t - 0.5) * SLOPE_SPAN_X,
+      SLOPE_BASE_Y + SLOPE_RISE * Math.pow(t, 1.7),
+      Math.sin(t * Math.PI * 2.2) * 0.22,
+    )
   }
 }
 
-function makeTube(path: Curve<Vector3>, lite: boolean) {
-  return lite ? new TubeGeometry(path, 120, 0.16, 12, true) : new TubeGeometry(path, 240, 0.16, 24, true)
-}
-
-// Spaced by radius *ratio*, not by m: the radius diverges as m -> 1, so
-// evenly-spaced m values put keyframes farther and farther apart in actual
-// shape terms near the end (the opposite of what's needed). These stops
-// keep each keyframe's radius about 1.28x the last, all the way up, so the
-// straight-line-between-keyframes blend never has to bridge a big enough
-// shape difference to visibly cut a "connecting" chord across the arc.
-const MORPH_STOPS = [0.221, 0.393, 0.527, 0.632, 0.7135, 1]
-
-/**
- * The base geometry is the m=0 circle; the morph targets are keyframes along
- * the opening-coil curve at each MORPH_STOPS value. Blending two adjacent
- * keyframes (or base→first keyframe) via morphTargetInfluences each frame
- * gives a GPU-driven approximation of the continuous unroll — cheap (static
- * precomputed buffers, no per-frame CPU geometry work) while still looking
- * like the coil is actually uncurling rather than jumping between shapes.
- */
-function buildUnrollGeometry(lite: boolean) {
-  const base = makeTube(new UnrollPath(0), lite)
-  const targets = MORPH_STOPS.map((m) => makeTube(new UnrollPath(m), lite))
-  base.morphAttributes.position = targets.map((g) => g.attributes.position)
-  if (base.attributes.normal && targets.every((g) => g.attributes.normal)) {
-    base.morphAttributes.normal = targets.map((g) => g.attributes.normal)
-  }
-  return base
-}
-
-/** Sets the two morphTargetInfluences that bracket `m` so the mesh sits exactly at the right point along the unroll. */
-function applyUnrollInfluence(mesh: Mesh | null, m: number) {
-  const inf = mesh?.morphTargetInfluences
-  if (!inf) return
-  for (let i = 0; i < inf.length; i++) inf[i] = 0
-  if (m <= 0) return
-  const stops = MORPH_STOPS.length
-  const idx = Math.min(stops - 1, Math.floor(m * stops))
-  const localT = m * stops - idx
-  if (idx === 0) {
-    inf[0] = localT
-  } else {
-    inf[idx - 1] = 1 - localT
-    inf[idx] = localT
-  }
+/** How much of the slope is drawn at page scroll p: never empty (the hero
+ *  shows the base of the climb), complete only at the very bottom. */
+function drawProgressFor(p: number) {
+  return 0.12 + 0.88 * clamp01(p)
 }
 
 /** 3-step gradient map for the toon material — the cel-shaded look. */
@@ -215,84 +113,69 @@ const scratchSolid = new Color()
 const scratchOutline = new Color()
 const scratchProjectAccent = new Color()
 
+const slopePath = new SlopePath()
+const scratchTip = new Vector3()
+
 /**
- * A single shape that genuinely uncoils from a circle into a line as the
- * page scrolls, via the opening-coil morph targets above — not a cross-fade
- * between two meshes, and not a raw per-vertex lerp between unrelated
- * shapes (which looks like the shape imploding rather than unraveling).
+ * The ascending slope that draws itself as the page scrolls — no morphing,
+ * no topology change, ever. The tube geometry is built once; each frame only
+ * drawRange moves (which indices the GPU renders), so the curve extends
+ * upward as the visitor descends the page. A small tip marker rides the end
+ * of the drawn portion: "you are here" on the climb.
  */
-function Knot({ lite }: { lite: boolean }) {
+function Slope({ lite }: { lite: boolean }) {
   const rig = useRef<Group>(null)
-  const spin = useRef<Group>(null)
   const solid = useRef<Mesh>(null)
   const outline = useRef<Mesh>(null)
-  const morph = useRef(0)
-  const quietWorldY = useRef(-0.8)
-  const quietSample = useRef(0)
+  const tip = useRef<Mesh>(null)
+  const draw = useRef(drawProgressFor(0))
   const surgeMix = useRef(0)
   const laffyMix = useRef(0)
   const gradientMap = useToonGradientMap()
-  const geometry = useMemo(() => buildUnrollGeometry(lite), [lite])
+  const geometry = useMemo(
+    () => (lite ? new TubeGeometry(slopePath, 120, 0.16, 12, false) : new TubeGeometry(slopePath, 240, 0.16, 24, false)),
+    [lite],
+  )
+  const tipGeometry = useMemo(() => new IcosahedronGeometry(0.2, 0), [])
+  const indexCount = geometry.index ? geometry.index.count : 0
 
-  useEffect(() => {
-    solid.current?.updateMorphTargets()
-    outline.current?.updateMorphTargets()
-  }, [geometry])
-
-  useFrame((state, delta) => {
+  useFrame((state) => {
     const max = document.documentElement.scrollHeight - window.innerHeight
     const p = max > 0 ? clamp01(window.scrollY / max) : 0
     const k = sample(p)
-    const scrollP = clamp01(window.scrollY / window.innerHeight)
-    const lineAmount = smoothstep(morph.current)
-    if (lineAmount > 0.45 && quietSample.current++ % 14 === 0) {
-      quietWorldY.current += (chooseQuietWorldY() - quietWorldY.current) * 0.35
-    }
-    const driftX = lineAmount * (
-      Math.sin(state.clock.elapsedTime * 0.48 + scrollP * 5.2) * 0.34
-      + Math.cos(state.clock.elapsedTime * 0.31) * 0.12
-    )
-    const driftY = lineAmount * Math.cos(state.clock.elapsedTime * 0.42 + scrollP * 3.6) * 0.16
-    const targetX = k.x * (1 - lineAmount) + (1.48 + driftX) * lineAmount
-    const targetY = k.y * (1 - lineAmount) + (quietWorldY.current + driftY) * lineAmount
+
+    draw.current += (drawProgressFor(p) - draw.current) * 0.05
+    // Snap the visible index count to whole triangles so the cut end stays clean.
+    const visible = Math.min(indexCount, Math.floor((indexCount * draw.current) / 3) * 3)
+    geometry.setDrawRange(0, visible)
 
     if (rig.current) {
-      rig.current.position.x += (targetX - rig.current.position.x) * 0.045
-      rig.current.position.y += (targetY - rig.current.position.y) * 0.045
+      rig.current.position.x += (k.x - rig.current.position.x) * 0.045
+      rig.current.position.y += (k.y - rig.current.position.y) * 0.045
       const s = rig.current.scale.x + (k.s - rig.current.scale.x) * 0.07
       rig.current.scale.setScalar(s)
-      // The coil is flat (z=0 always) and grows much wider as it opens, so any
-      // cursor tilt beyond the compact-circle state turns part of the ring
-      // edge-on to the camera and foreshortens it into what looks like a
-      // separate thin line. Kill the tilt fast, well before the ring has
-      // opened up much, instead of just tapering it — a subtle amount at the
-      // fully-closed circle is fine, any amount on a wide-open arc isn't.
-      const tiltFalloff = Math.max(0, 1 - lineAmount * 3)
-      const targetRotY = state.pointer.x * 0.5 * tiltFalloff
-      const targetRotX = state.pointer.y * -0.3 * tiltFalloff
+      // Gentle parallax only — the tube has real z-depth from its undulation,
+      // so a small tilt adds dimension without foreshortening it into a line.
+      const targetRotY = state.pointer.x * 0.15
+      const targetRotX = state.pointer.y * -0.1
       rig.current.rotation.y += (targetRotY - rig.current.rotation.y) * 0.05
       rig.current.rotation.x += (targetRotX - rig.current.rotation.x) * 0.05
     }
 
-    morph.current += (k.m - morph.current) * 0.045
+    // The tip marker sits at the end of the drawn portion of the curve
+    // (local coordinates — it lives inside the same rig/Float transform).
+    if (tip.current) {
+      slopePath.getPoint(draw.current, scratchTip)
+      tip.current.position.copy(scratchTip)
+      tip.current.rotation.y += 0.01
+      tip.current.rotation.z += 0.004
+    }
 
-    applyUnrollInfluence(solid.current, lineAmount)
-    applyUnrollInfluence(outline.current, lineAmount)
-
-    // Each project's pinned story gives the knot a distinct temperament:
-    // Surge (analytical, review/test) spins faster and cooler; Laffy
-    // (personalized, unbox) settles and warms toward its rose accent.
+    // Each project's pinned story tints the whole climb: Surge cools it
+    // toward teal, Laffy warms it toward rose; the emissive lift makes the
+    // slope glow slightly brighter while a story is being told.
     surgeMix.current += ((scrollState.activeProject === 'surge' ? 1 : 0) - surgeMix.current) * 0.05
     laffyMix.current += ((scrollState.activeProject === 'laffy' ? 1 : 0) - laffyMix.current) * 0.05
-    const spinRate = 1 + surgeMix.current * 0.9 - laffyMix.current * 0.5
-
-    if (spin.current) {
-      const knotness = 1 - morph.current
-      spin.current.rotation.z += delta * knotness * (0.15 + scrollP * 0.5) * spinRate
-      spin.current.rotation.x += (0 - spin.current.rotation.x) * morph.current * 0.03
-      spin.current.rotation.y += (0 - spin.current.rotation.y) * morph.current * 0.03
-      spin.current.rotation.z += (LINE_TILT - spin.current.rotation.z) * lineAmount * 0.04
-    }
 
     const { paperRgb, accentRgb, surgeRgb, laffyRgb, inkRgb, dev } = scrollState.palette
     scratchSolid.setRGB(
@@ -310,92 +193,42 @@ function Knot({ lite }: { lite: boolean }) {
     }
     scratchOutline.setRGB(inkRgb[0], inkRgb[1], inkRgb[2])
 
+    const storyGlow = (surgeMix.current + laffyMix.current) * 0.12
     const mat = solid.current?.material as MeshToonMaterial | undefined
     if (mat) {
       mat.opacity += (k.o - mat.opacity) * 0.08
       mat.color.copy(scratchSolid)
-      mat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15)
+      mat.emissive.copy(scratchSolid).multiplyScalar(0.18 + dev * 0.15 + storyGlow)
     }
     const outlineMat = outline.current?.material as MeshBasicMaterial | undefined
     if (outlineMat && mat) {
       outlineMat.opacity = mat.opacity * 0.85
       outlineMat.color.copy(scratchOutline)
     }
+    const tipMat = tip.current?.material as MeshToonMaterial | undefined
+    if (tipMat && mat) {
+      tipMat.opacity += (k.o - tipMat.opacity) * 0.08
+      tipMat.color.copy(scratchSolid)
+      tipMat.emissive.copy(scratchSolid).multiplyScalar(0.35 + storyGlow)
+    }
   })
 
   return (
     <group ref={rig}>
-      <Float speed={1.3} rotationIntensity={0.5} floatIntensity={1}>
-        <group ref={spin}>
-          <mesh ref={solid} geometry={geometry}>
-            <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
-          </mesh>
-          {/* Uniform scale-up around the origin only gives a constant-width
-              rim for a compact, centered shape (the old torus knot). This
-              shape spreads out much farther from the origin as it opens,
-              so the same scale drifts the outline more at the far tips than
-              near the center — a smaller multiplier keeps that drift small
-              enough not to visibly detach from the solid mesh. */}
-          <mesh ref={outline} geometry={geometry} scale={1.008}>
-            <meshBasicMaterial side={BackSide} transparent opacity={0} />
-          </mesh>
-        </group>
+      <Float speed={1.3} rotationIntensity={0.15} floatIntensity={0.6}>
+        <mesh ref={solid} geometry={geometry}>
+          <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
+        </mesh>
+        {/* Small multiplier: the slope reaches far from the origin, so a
+            uniform scale-up drifts the outline more at the ends than the
+            middle — keep it tight so the rim never visibly detaches. */}
+        <mesh ref={outline} geometry={geometry} scale={1.008}>
+          <meshBasicMaterial side={BackSide} transparent opacity={0} />
+        </mesh>
+        <mesh ref={tip} geometry={tipGeometry}>
+          <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
+        </mesh>
       </Float>
-    </group>
-  )
-}
-
-/** A small companion shape that lags the knot with heavier damping — the traveling-alongside feel. */
-function Companion() {
-  const rig = useRef<Group>(null)
-  const solid = useRef<Mesh>(null)
-  const outline = useRef<Mesh>(null)
-  const pos = useRef(new Vector3(2.9, -0.6, -0.4))
-  const gradientMap = useToonGradientMap()
-  const geometry = useMemo(() => new IcosahedronGeometry(0.16, 0), [])
-
-  useFrame((state) => {
-    const max = document.documentElement.scrollHeight - window.innerHeight
-    const p = max > 0 ? clamp01(window.scrollY / max) : 0
-    const k = sample(p)
-    const targetX = k.x + 0.55
-    const targetY = k.y - 0.42
-    pos.current.x += (targetX - pos.current.x) * 0.02
-    pos.current.y += (targetY - pos.current.y) * 0.02
-    if (rig.current) {
-      rig.current.position.copy(pos.current)
-      rig.current.rotation.y += (state.pointer.x * 0.6 - rig.current.rotation.y) * 0.04
-      rig.current.rotation.x += (state.pointer.y * -0.4 - rig.current.rotation.x) * 0.04
-      rig.current.rotation.z += 0.004
-    }
-    const { paperRgb, accentRgb, inkRgb, dev } = scrollState.palette
-    const solidMat = solid.current?.material as MeshToonMaterial | undefined
-    if (solidMat) {
-      solidMat.opacity += (k.o * 0.7 - solidMat.opacity) * 0.07
-      scratchSolid.setRGB(
-        paperRgb[0] + (accentRgb[0] - paperRgb[0]) * dev,
-        paperRgb[1] + (accentRgb[1] - paperRgb[1]) * dev,
-        paperRgb[2] + (accentRgb[2] - paperRgb[2]) * dev,
-      )
-      solidMat.color.copy(scratchSolid)
-      solidMat.emissive.copy(scratchSolid).multiplyScalar(0.3)
-    }
-    const outlineMat = outline.current?.material as MeshBasicMaterial | undefined
-    if (outlineMat && solidMat) {
-      outlineMat.opacity = solidMat.opacity * 0.85
-      scratchOutline.setRGB(inkRgb[0], inkRgb[1], inkRgb[2])
-      outlineMat.color.copy(scratchOutline)
-    }
-  })
-
-  return (
-    <group ref={rig}>
-      <mesh ref={solid} geometry={geometry}>
-        <meshToonMaterial gradientMap={gradientMap} transparent opacity={0} />
-      </mesh>
-      <mesh ref={outline} geometry={geometry} scale={1.08}>
-        <meshBasicMaterial side={BackSide} transparent opacity={0} />
-      </mesh>
     </group>
   )
 }
@@ -506,7 +339,8 @@ function FinaleBloom() {
     const p = max > 0 ? clamp01(window.scrollY / max) : 0
     const k = sample(p)
     if (points.current) {
-      points.current.position.set(k.x, k.y, 0)
+      // Bloom at the summit — the top end of the fully-drawn slope.
+      points.current.position.set(k.x + (SLOPE_SPAN_X / 2) * k.s, k.y + (SLOPE_BASE_Y + SLOPE_RISE) * k.s, 0)
       points.current.rotation.y += 0.0015
     }
     const window0 = clamp01((p - 0.86) / 0.06)
@@ -529,7 +363,7 @@ function FinaleBloom() {
 
 const LAFFY_BLOOM_COUNT = 220
 
-/** Soft particle bloom that swells in behind the knot while Laffy's story beats are pinned. */
+/** Soft particle bloom that swells in behind the slope while Laffy's story beats are pinned. */
 function LaffyBloom() {
   const points = useRef<Points>(null)
   const geometry = useMemo(() => createBloomGeometry(LAFFY_BLOOM_COUNT), [])
@@ -580,8 +414,7 @@ export default function BackgroundScene({ lite = false }: { lite?: boolean }) {
       onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
     >
       <Lights />
-      <Knot lite={lite} />
-      {!lite && <Companion />}
+      <Slope lite={lite} />
       {!lite && <DebrisCorridor />}
       <LaffyBloom />
       <FinaleBloom />
